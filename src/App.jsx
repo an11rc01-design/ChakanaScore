@@ -9,6 +9,7 @@ import Administrador from "./pages/Administrador";
 import GestionParticipantes from "./pages/GestionParticipantes";
 import ResultadosAdmin from "./pages/ResultadosAdmin";
 import ConfiguracionTorneo from "./pages/ConfiguracionTorneo";
+import ReiniciarTorneo from "./pages/ReiniciarTorneo";
 
 function App() {
   return (
@@ -38,6 +39,10 @@ function App() {
           path="/evaluacion/:participanteId"
           element={<Evaluacion />}
         />
+        <Route
+  path="/administrador/reiniciar"
+  element={<ReiniciarTorneo />}
+/>
       </Routes>
     </BrowserRouter>
   );

@@ -581,6 +581,37 @@ app.post("/admin/reiniciar-puntajes", (req, res) => {
     });
   });
 });
+app.post("/admin/reiniciar-puntajes", (req, res) => {
+  const claveIngresada = String(req.body.clave || "");
+  const claveCorrecta = process.env.ADMIN_RESET_KEY;
+
+  if (!claveCorrecta) {
+    return res.status(500).json({
+      error: "La clave de reinicio no está configurada en el servidor.",
+    });
+  }
+
+  if (claveIngresada !== claveCorrecta) {
+    return res.status(403).json({
+      error: "Clave incorrecta.",
+    });
+  }
+
+  db.run("DELETE FROM puntajes", function (err) {
+    if (err) {
+      console.error(err);
+
+      return res.status(500).json({
+        error: "No se pudieron eliminar las evaluaciones.",
+      });
+    }
+
+    res.json({
+      mensaje: "Torneo reiniciado correctamente.",
+      evaluaciones_eliminadas: this.changes,
+    });
+  });
+});
 app.listen(PORT, () => {
   console.log(`✅ Servidor iniciado en el puerto ${PORT}`);
 });

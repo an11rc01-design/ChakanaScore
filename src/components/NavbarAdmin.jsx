@@ -17,6 +17,16 @@ const enlaces = [
     icono: "📊",
   },
   {
+    ruta: "/administrador/configuracion",
+    texto: "Configuración",
+    icono: "⚙️",
+  },
+  {
+    ruta: "/administrador/reiniciar",
+    texto: "Reiniciar",
+    icono: "🗑️",
+  },
+  {
     ruta: "/publico",
     texto: "Pantalla pública",
     icono: "📺",
@@ -38,11 +48,6 @@ export default function NavbarAdmin() {
       }}
     >
       {enlaces.map((enlace) => (
-        {
-  ruta: "/administrador/configuracion",
-  texto: "Configuración",
-  icono: "⚙️",
-},
         <NavLink
           key={enlace.ruta}
           to={enlace.ruta}
