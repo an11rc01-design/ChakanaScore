@@ -12,7 +12,7 @@ export default function Login() {
   useEffect(() => {
     async function cargarJurados() {
       try {
-        const respuesta = await fetch("http://localhost:3001/jurados");
+        const respuesta = await fetch("https://chakanascore.onrender.com/jurados");
 
         if (!respuesta.ok) {
           throw new Error("El servidor no respondió correctamente");

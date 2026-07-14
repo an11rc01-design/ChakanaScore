@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-const API_URL = "http://localhost:3001";
+const API_URL = "https://chakanascore.onrender.com";
 
 export default function Publico() {
   const [categorias, setCategorias] = useState([]);

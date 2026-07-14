@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavbarAdmin from "../components/NavbarAdmin";
 
-const API_URL = "http://localhost:3001";
+const API_URL = "https://chakanascore.onrender.com";
 
 export default function ConfiguracionTorneo() {
   const navigate = useNavigate();

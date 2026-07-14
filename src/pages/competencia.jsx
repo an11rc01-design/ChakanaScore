@@ -20,7 +20,7 @@ export default function Competencia() {
         setError("");
 
         const respuesta = await fetch(
-          `http://localhost:3001/participantes/${id}`
+          `https://chakanascore.onrender.com/participantes/${id}`
         );
 
         if (!respuesta.ok) {
@@ -32,7 +32,7 @@ export default function Competencia() {
         const participantesRevisados = await Promise.all(
           datos.map(async (participante) => {
             const respuestaPuntaje = await fetch(
-              `http://localhost:3001/puntajes/${participante.id}/${juradoId}`
+              `https://chakanascore.onrender.com/puntajes/${participante.id}/${juradoId}`
             );
 
             if (!respuestaPuntaje.ok) {

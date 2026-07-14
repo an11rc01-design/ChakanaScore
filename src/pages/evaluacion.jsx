@@ -49,7 +49,7 @@ export default function Evaluacion() {
 
   useEffect(() => {
     useEffect(() => {
-  fetch(`http://localhost:3001/participante/${participanteId}`)
+  fetch(`https://chakanascore.onrender.com/participante/${participanteId}`)
     .then((r) => r.json())
     .then((data) => setParticipante(data))
     .catch(console.error);
@@ -62,7 +62,7 @@ export default function Evaluacion() {
         }
 
         const respuesta = await fetch(
-          `http://localhost:3001/puntajes/${participanteId}/${juradoId}`
+          `https://chakanascore.onrender.com/puntajes/${participanteId}/${juradoId}`
         );
 
         if (!respuesta.ok) {
@@ -112,7 +112,7 @@ export default function Evaluacion() {
     setMensaje("");
 
     try {
-      const respuesta = await fetch("http://localhost:3001/puntajes", {
+      const respuesta = await fetch("https://chakanascore.onrender.com/puntajes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

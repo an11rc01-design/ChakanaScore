@@ -11,7 +11,7 @@ export default function Panel() {
     localStorage.getItem("nombreJurado") || "Jurado no identificado";
 
   useEffect(() => {
-    fetch("http://localhost:3001/categorias")
+    fetch("https://chakanascore.onrender.com/categorias")
       .then((respuesta) => {
         if (!respuesta.ok) {
           throw new Error("No se pudieron cargar las categorías.");
