@@ -442,7 +442,7 @@ export default function Publico() {
             );
           })}
         </div>
-      </div>
+            </div>
 
       <style>{`
         @media (max-width: 850px) {

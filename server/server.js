@@ -243,52 +243,62 @@ app.get("/resultados/:categoria", (req, res) => {
   db.all(
     `
     SELECT
-      p.id,
-      p.nombre,
+    p.id,
+    p.codigo,
+    p.nombre,
 
-      COUNT(DISTINCT pu.jurado_id) AS jurados_evaluados,
+    COUNT(DISTINCT pu.jurado_id) AS jurados_evaluados,
 
-      COALESCE(
+    MAX(CASE WHEN pu.jurado_id = 1 THEN pu.total END) AS jurado_1,
+    MAX(CASE WHEN pu.jurado_id = 2 THEN pu.total END) AS jurado_2,
+    MAX(CASE WHEN pu.jurado_id = 3 THEN pu.total END) AS jurado_3,
+    MAX(CASE WHEN pu.jurado_id = 4 THEN pu.total END) AS jurado_4,
+    MAX(CASE WHEN pu.jurado_id = 5 THEN pu.total END) AS jurado_5,
+
+    COALESCE(
         SUM(
-          CASE
-            WHEN j.visible = 1 THEN pu.total
-            ELSE 0
-          END
+            CASE
+                WHEN j.visible = 1 THEN pu.total
+                ELSE 0
+            END
         ),
         0
-      ) AS total_visible,
+    ) AS total_visible,
 
-      COALESCE(
+    COALESCE(
         SUM(
-          CASE
-            WHEN j.visible = 0 THEN pu.total
-            ELSE 0
-          END
+            CASE
+                WHEN j.visible = 0 THEN pu.total
+                ELSE 0
+            END
         ),
         0
-      ) AS total_incognito,
+    ) AS total_incognito,
 
-      COALESCE(SUM(pu.total), 0) AS total_general
+    COALESCE(SUM(pu.total),0) AS total_general
 
-    FROM participantes p
+FROM participantes p
 
-    LEFT JOIN puntajes pu
-      ON pu.participante_id = p.id
+LEFT JOIN puntajes pu
+ON pu.participante_id=p.id
 
-    LEFT JOIN jurados j
-      ON j.id = pu.jurado_id
+LEFT JOIN jurados j
+ON j.id=pu.jurado_id
 
-    WHERE p.categoria_id = ?
+WHERE p.categoria_id=?
 
-    GROUP BY p.id, p.nombre
+GROUP BY
+p.id,
+p.codigo,
+p.nombre
 
-    ORDER BY
-      CASE
-        WHEN COUNT(DISTINCT pu.jurado_id) = 5
-        THEN COALESCE(SUM(pu.total), 0)
-        ELSE 0
-      END DESC,
-      p.nombre ASC
+ORDER BY
+CASE
+WHEN COUNT(DISTINCT pu.jurado_id)=5
+THEN COALESCE(SUM(pu.total),0)
+ELSE 0
+END DESC,
+p.nombre;
     `,
     [categoriaId],
     (err, rows) => {
