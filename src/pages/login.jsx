@@ -110,13 +110,11 @@ export default function Login() {
       >
         <img
   src="/logo-wiracocha.jpeg"
-  alt="Producciones Wiracocha"
+  alt="Logo"
   style={{
     width: "150px",
     height: "150px",
     objectFit: "contain",
-    borderRadius: "50%",
-    marginBottom: "10px",
   }}
 />
 
