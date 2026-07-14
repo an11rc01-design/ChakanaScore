@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import logoWiracocha from "../assets/logo-wiracocha.jpeg";
 
 import logoWiracocha from "../assets/logo-wiracocha.jpeg";
 import flyerChakana from "../assets/flyer-chakana.jpeg";
@@ -110,7 +109,7 @@ export default function Login() {
         }}
       >
         <img
-  src={logoWiracocha}
+  src="/logo-wiracocha.jpeg"
   alt="Producciones Wiracocha"
   style={{
     width: "150px",
