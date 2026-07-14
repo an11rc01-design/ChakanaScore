@@ -1,0 +1,61 @@
+# Query: http://localhost:3001
+# ContextLines: 1
+
+12 results - 9 files
+
+src\pages\Administrador.jsx:
+  4  
+  5: const API_URL = "https://chakanascore.onrender.com";
+  6  
+
+src\pages\competencia.jsx:
+  22          const respuesta = await fetch(
+  23:           `https://chakanascore.onrender.com/participantes/${id}`
+  24          );
+
+  34              const respuestaPuntaje = await fetch(
+  35:               `https://chakanascore.onrender.com/puntajes/${participante.id}/${juradoId}`
+  36              );
+
+src\pages\ConfiguracionTorneo.jsx:
+  4  
+  5: const API_URL = "https://chakanascore.onrender.com";
+  6  
+
+src\pages\evaluacion.jsx:
+   51      useEffect(() => {
+   52:   fetch(`https://chakanascore.onrender.com/participante/${participanteId}`)
+   53      .then((r) => r.json())
+
+   64          const respuesta = await fetch(
+   65:           `https://chakanascore.onrender.com/puntajes/${participanteId}/${juradoId}`
+   66          );
+
+  114      try {
+  115:       const respuesta = await fetch("https://chakanascore.onrender.com/puntajes", {
+  116          method: "POST",
+
+src\pages\GestionParticipantes.jsx:
+  4  
+  5: const API_URL = "https://chakanascore.onrender.com";
+  6  
+
+src\pages\login.jsx:
+  14        try {
+  15:         const respuesta = await fetch("https://chakanascore.onrender.com/jurados");
+  16  
+
+src\pages\panel.jsx:
+  13    useEffect(() => {
+  14:     fetch("https://chakanascore.onrender.com/categorias")
+  15        .then((respuesta) => {
+
+src\pages\publico.jsx:
+  2  
+  3: const API_URL = "https://chakanascore.onrender.com";
+  4  
+
+src\pages\ResultadosAdmin.jsx:
+  4  
+  5: const API_URL = "https://chakanascore.onrender.com";
+  6  
