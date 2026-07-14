@@ -402,8 +402,9 @@ app.get("/detalle-resultados/:categoria", (req, res) => {
   db.all(
     `
     SELECT
-      p.id AS participante_id,
-      p.nombre AS participante,
+  p.id AS participante_id,
+  p.codigo AS codigo,
+  p.nombre AS participante,
 
       MAX(CASE WHEN pu.jurado_id = 1 THEN pu.total END) AS jurado_1,
       MAX(CASE WHEN pu.jurado_id = 2 THEN pu.total END) AS jurado_2,
@@ -560,7 +561,7 @@ const PORT = process.env.PORT || 3001;
 app.post("/admin/reiniciar-puntajes", (req, res) => {
   const { clave } = req.body;
 
-  if (clave !== "CHAKANA2026") {
+  {
     return res.status(403).json({
       error: "Clave incorrecta.",
     });
