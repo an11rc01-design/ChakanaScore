@@ -355,11 +355,14 @@ export default function Publico() {
   }}
 >
   {[
-    { nombre: "J1", valor: resultado.jurado_1 },
-    { nombre: "J2", valor: resultado.jurado_2 },
-    { nombre: "J3", valor: resultado.jurado_3 },
-    { nombre: "J4", valor: resultado.jurado_4 },
-  ].map((j) => (
+  { nombre: "J1", valor: resultado.jurado_1 },
+  { nombre: "J2", valor: resultado.jurado_2 },
+  { nombre: "J3", valor: resultado.jurado_3 },
+
+  { nombre: "🔒", valor: null },
+  { nombre: "🔒", valor: null },
+
+].map((j) => (
     <div
       key={j.nombre}
       style={{
@@ -388,7 +391,7 @@ export default function Publico() {
           color: "white",
         }}
       >
-        {j.valor ?? "-"}
+        {j.valor === null ? "RESERVADO" : j.valor}
       </div>
     </div>
   ))}
@@ -410,7 +413,7 @@ export default function Publico() {
                         fontSize: "18px",
                       }}
                     >
-                      Puntaje Visible
+                      TOTAL PARCIAL
                     </p>
 
                     <strong
@@ -421,7 +424,9 @@ export default function Publico() {
     fontSize: "52px",
   }}
 >
-  {resultado.total_visible}
+  {Number(resultado.jurado_1 || 0) +
+ Number(resultado.jurado_2 || 0) +
+ Number(resultado.jurado_3 || 0)}
 </strong>
 
                     {indice === 0 && (
