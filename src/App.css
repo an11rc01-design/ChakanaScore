@@ -1,0 +1,93 @@
+body {
+  margin: 0;
+  background: #111827;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+
+h1 {
+  font-size: 60px;
+  color: gold;
+}
+
+h2 {
+  margin: 0;
+  font-weight: normal;
+}
+
+h3 {
+  color: #cccccc;
+}
+
+button {
+  background: gold;
+  color: black;
+  border: none;
+  padding: 18px 40px;
+  border-radius: 10px;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+button:hover {
+  transform: scale(1.05);
+}
+.menu{
+
+    height:100vh;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:20px;
+
+}
+
+.menu button{
+
+    width:320px;
+
+}
+input{
+
+    width:320px;
+
+    padding:12px;
+
+    border-radius:8px;
+
+    border:none;
+
+    font-size:18px;
+
+}
+
+label{
+
+    width:320px;
+
+    display:flex;
+
+    gap:10px;
+
+    justify-content:flex-start;
+
+    align-items:center;
+
+    color:white;
+
+}
