@@ -391,7 +391,7 @@ export default function Publico() {
           color: "white",
         }}
       >
-        {j.valor === null ? "RESERVADO" : j.valor}
+        {j.valor === null ? "🔒" : j.valor}
       </div>
     </div>
   ))}
