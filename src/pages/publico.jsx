@@ -130,7 +130,7 @@ export default function Publico() {
               fontSize: "clamp(42px, 6vw, 72px)",
             }}
           >
-            🏆 ChakanaScore
+            🏆 WiracochaScore
           </h1>
 
           <h2

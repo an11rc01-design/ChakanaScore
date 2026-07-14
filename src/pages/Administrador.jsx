@@ -156,7 +156,7 @@ export default function Administrador() {
                 fontWeight: "bold",
               }}
             >
-              CHAKANASCORE
+              WiracochaScore
             </p>
 
             <h1

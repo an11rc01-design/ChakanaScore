@@ -142,7 +142,7 @@ export default function Login() {
             textShadow: "0 3px 12px rgba(0,0,0,0.7)",
           }}
         >
-          ChakanaScore
+          WiracochaScore
         </h1>
 
         <h2
