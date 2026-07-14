@@ -349,7 +349,7 @@ export default function Publico() {
                 <div
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(5,1fr)",
+    gridTemplateColumns: "repeat(5, minmax(85px, 1fr))",
     gap: "12px",
     gridColumn: "3 / span 2",
   }}
@@ -450,17 +450,71 @@ export default function Publico() {
             </div>
 
       <style>{`
-        @media (max-width: 850px) {
-          article {
-            grid-template-columns: 70px 1fr !important;
-          }
+  @media (max-width: 850px) {
+    body {
+      overflow-x: hidden;
+    }
 
-          article > div:nth-of-type(3),
-          article > div:nth-of-type(4) {
-            text-align: left !important;
-          }
-        }
-      `}</style>
+    article {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+      padding: 18px !important;
+    }
+
+    article > div:first-child {
+      font-size: 30px !important;
+    }
+
+    article h3 {
+      font-size: 26px !important;
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    article > div:nth-of-type(2) {
+      text-align: center;
+    }
+
+    article > div:nth-of-type(3) {
+      grid-column: 1 / -1 !important;
+      grid-template-columns: repeat(3, minmax(70px, 1fr)) !important;
+      gap: 8px !important;
+      width: 100% !important;
+    }
+
+    article > div:nth-of-type(3) > div {
+      min-width: 0 !important;
+      padding: 9px 5px !important;
+    }
+
+    article > div:nth-of-type(3) > div > div:first-child {
+      font-size: 15px !important;
+    }
+
+    article > div:nth-of-type(3) > div > div:last-child {
+      font-size: 25px !important;
+    }
+
+    article > div:last-child {
+      grid-column: 1 / -1 !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    article {
+      padding: 14px !important;
+      border-radius: 14px !important;
+    }
+
+    article h3 {
+      font-size: 23px !important;
+    }
+
+    article > div:nth-of-type(3) {
+      grid-template-columns: repeat(3, 1fr) !important;
+    }
+  }
+`}</style>
     </div>
   );
 }
