@@ -13,33 +13,59 @@ export default function ResultadosAdmin() {
   const [categorias, setCategorias] = useState([]);
   const [categoriaId, setCategoriaId] = useState("");
   const [resultados, setResultados] = useState([]);
+  const [torneo, setTorneo] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [exportando, setExportando] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function cargarCategorias() {
+    async function cargarDatosIniciales() {
       try {
-        const respuesta = await fetch(`${API_URL}/categorias`);
-        if (!respuesta.ok) throw new Error("No se pudieron cargar las categorías.");
-        const datos = await respuesta.json();
-        setCategorias(datos);
-        if (datos.length > 0) setCategoriaId(String(datos[0].id));
+        const [respuestaCategorias, respuestaTorneo] = await Promise.all([
+          fetch(`${API_URL}/categorias`),
+          fetch(`${API_URL}/torneo`),
+        ]);
+
+        if (!respuestaCategorias.ok) {
+          throw new Error("No se pudieron cargar las categorías.");
+        }
+
+        const datosCategorias = await respuestaCategorias.json();
+        const datosTorneo = respuestaTorneo.ok
+          ? await respuestaTorneo.json()
+          : null;
+
+        setCategorias(datosCategorias);
+        setTorneo(datosTorneo);
+
+        if (datosCategorias.length > 0) {
+          setCategoriaId(String(datosCategorias[0].id));
+        }
       } catch (errorCarga) {
         console.error(errorCarga);
         setError(errorCarga.message);
         setCargando(false);
       }
     }
-    cargarCategorias();
+
+    cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
-    if (!categoriaId) return undefined;
+    if (!categoriaId) {
+      return undefined;
+    }
 
     async function cargarResultados() {
       try {
-        const respuesta = await fetch(`${API_URL}/detalle-resultados/${categoriaId}`);
-        if (!respuesta.ok) throw new Error("No se pudieron cargar los resultados.");
+        const respuesta = await fetch(
+          `${API_URL}/detalle-resultados/${categoriaId}`
+        );
+
+        if (!respuesta.ok) {
+          throw new Error("No se pudieron cargar los resultados.");
+        }
+
         const datos = await respuesta.json();
         setResultados(datos);
         setError("");
@@ -53,32 +79,43 @@ export default function ResultadosAdmin() {
 
     setCargando(true);
     cargarResultados();
+
     const intervalo = setInterval(cargarResultados, 3000);
+
     return () => clearInterval(intervalo);
   }, [categoriaId]);
 
   const categoriaActual = useMemo(
-    () => categorias.find((categoria) => String(categoria.id) === String(categoriaId)),
+    () =>
+      categorias.find(
+        (categoria) => String(categoria.id) === String(categoriaId)
+      ),
     [categorias, categoriaId]
   );
 
   const nombreCategoria = categoriaActual?.nombre || "Categoria";
-  const nombreArchivo = nombreCategoria
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "_");
+  const nombreTorneo = torneo?.nombre || "La Chakana Sagrada 2026";
+  const lugarTorneo = torneo?.lugar || "";
+  const fechaTorneo = torneo?.fecha || "";
 
-  function obtenerLugar(resultado, indice) {
-    return Number(resultado.jurados_evaluados) === 5 ? indice + 1 : "";
+  function limpiarNombreArchivo(texto) {
+    return String(texto || "archivo")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
   }
 
-  function exportarExcel() {
-    if (resultados.length === 0) {
-      alert("No existen resultados para exportar.");
-      return;
-    }
+  function resultadoCompleto(resultado) {
+    return Number(resultado.jurados_evaluados) === 5;
+  }
 
-    const filas = resultados.map((resultado, indice) => ({
+  function obtenerLugar(resultado, indice) {
+    return resultadoCompleto(resultado) ? indice + 1 : "";
+  }
+
+  function crearFilasExcel(lista) {
+    return lista.map((resultado, indice) => ({
       Lugar: obtenerLugar(resultado, indice),
       Código: resultado.codigo || "",
       Competidor: resultado.participante,
@@ -88,39 +125,230 @@ export default function ResultadosAdmin() {
       "Jurado 4": resultado.jurado_4 ?? "",
       "Jurado 5 - Incógnito": resultado.jurado_5 ?? "",
       "Jurados evaluados": `${resultado.jurados_evaluados}/5`,
-      "Puntaje total":
-        Number(resultado.jurados_evaluados) === 5
-          ? resultado.total_general
-          : "Pendiente",
+      "Puntaje total": resultadoCompleto(resultado)
+        ? resultado.total_general
+        : "Pendiente",
     }));
-
-    const hoja = XLSX.utils.json_to_sheet(filas);
-    hoja["!cols"] = [
-      { wch: 9 }, { wch: 12 }, { wch: 34 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 16 },
-    ];
-
-    const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, nombreCategoria.substring(0, 31));
-    XLSX.writeFile(libro, `Resultados_${nombreArchivo}.xlsx`);
   }
 
-  function exportarPDF() {
+  async function obtenerTodasLasCategorias() {
+    const respuestas = await Promise.all(
+      categorias.map(async (categoria) => {
+        const respuesta = await fetch(
+          `${API_URL}/detalle-resultados/${categoria.id}`
+        );
+
+        if (!respuesta.ok) {
+          throw new Error(
+            `No se pudieron cargar los resultados de ${categoria.nombre}.`
+          );
+        }
+
+        const datos = await respuesta.json();
+
+        return {
+          categoria,
+          resultados: datos,
+        };
+      })
+    );
+
+    return respuestas;
+  }
+
+  function agregarResumenExcel(libro, datosCategorias) {
+    const filasResumen = datosCategorias.map(({ categoria, resultados }) => {
+      const completos = resultados.filter(resultadoCompleto).length;
+      const total = resultados.length;
+      const evaluaciones = resultados.reduce(
+        (suma, resultado) =>
+          suma + Number(resultado.jurados_evaluados || 0),
+        0
+      );
+
+      return {
+        Categoría: categoria.nombre,
+        Competidores: total,
+        "Competidores completos": completos,
+        "Evaluaciones realizadas": evaluaciones,
+        "Evaluaciones requeridas": total * 5,
+        Estado:
+          total > 0 && completos === total
+            ? "Categoría completa"
+            : "Evaluaciones pendientes",
+      };
+    });
+
+    const hojaResumen = XLSX.utils.json_to_sheet(filasResumen, {
+      origin: "A6",
+    });
+
+    XLSX.utils.sheet_add_aoa(
+      hojaResumen,
+      [
+        [nombreTorneo],
+        ["RESULTADOS GENERALES DE LA COMPETENCIA"],
+        [`Lugar: ${lugarTorneo || "No informado"}`],
+        [`Fecha: ${fechaTorneo || "No informada"}`],
+        [],
+      ],
+      { origin: "A1" }
+    );
+
+    hojaResumen["!cols"] = [
+      { wch: 28 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 24 },
+      { wch: 24 },
+      { wch: 24 },
+    ];
+
+    XLSX.utils.book_append_sheet(libro, hojaResumen, "Resumen");
+  }
+
+  function exportarExcelCategoria() {
     if (resultados.length === 0) {
       alert("No existen resultados para exportar.");
       return;
     }
 
-    const documento = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    documento.setFont("helvetica", "bold");
-    documento.setFontSize(20);
-    documento.text("LA CHAKANA SAGRADA 2026", 148, 16, { align: "center" });
-    documento.setFontSize(15);
-    documento.text("RESULTADOS OFICIALES", 148, 25, { align: "center" });
-    documento.setFontSize(13);
-    documento.text(nombreCategoria.toUpperCase(), 148, 33, { align: "center" });
+    const libro = XLSX.utils.book_new();
+    const hoja = XLSX.utils.json_to_sheet(crearFilasExcel(resultados), {
+      origin: "A6",
+    });
 
-    const filas = resultados.map((resultado, indice) => [
+    XLSX.utils.sheet_add_aoa(
+      hoja,
+      [
+        [nombreTorneo],
+        ["RESULTADOS DE CATEGORÍA"],
+        [`Categoría: ${nombreCategoria}`],
+        [`Lugar: ${lugarTorneo || "No informado"}`],
+        [`Fecha: ${fechaTorneo || "No informada"}`],
+      ],
+      { origin: "A1" }
+    );
+
+    hoja["!cols"] = [
+      { wch: 9 },
+      { wch: 12 },
+      { wch: 34 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 16 },
+    ];
+
+    XLSX.utils.book_append_sheet(
+      libro,
+      hoja,
+      nombreCategoria.substring(0, 31)
+    );
+
+    XLSX.writeFile(
+      libro,
+      `Resultados_${limpiarNombreArchivo(nombreCategoria)}.xlsx`
+    );
+  }
+
+  async function exportarExcelCompleto() {
+    if (categorias.length === 0) {
+      alert("No existen categorías para exportar.");
+      return;
+    }
+
+    setExportando(true);
+
+    try {
+      const datosCategorias = await obtenerTodasLasCategorias();
+      const libro = XLSX.utils.book_new();
+
+      agregarResumenExcel(libro, datosCategorias);
+
+      datosCategorias.forEach(({ categoria, resultados: lista }) => {
+        const hoja = XLSX.utils.json_to_sheet(crearFilasExcel(lista), {
+          origin: "A6",
+        });
+
+        XLSX.utils.sheet_add_aoa(
+          hoja,
+          [
+            [nombreTorneo],
+            ["RESULTADOS OFICIALES"],
+            [`Categoría: ${categoria.nombre}`],
+            [`Lugar: ${lugarTorneo || "No informado"}`],
+            [`Fecha: ${fechaTorneo || "No informada"}`],
+          ],
+          { origin: "A1" }
+        );
+
+        hoja["!cols"] = [
+          { wch: 9 },
+          { wch: 12 },
+          { wch: 34 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 20 },
+          { wch: 18 },
+          { wch: 16 },
+        ];
+
+        XLSX.utils.book_append_sheet(
+          libro,
+          hoja,
+          categoria.nombre.substring(0, 31)
+        );
+      });
+
+      XLSX.writeFile(
+        libro,
+        `Resultados_Completos_${limpiarNombreArchivo(nombreTorneo)}.xlsx`
+      );
+    } catch (errorExportacion) {
+      console.error(errorExportacion);
+      alert(errorExportacion.message);
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  function agregarCabeceraPDF(documento, subtitulo) {
+    documento.setFont("helvetica", "bold");
+    documento.setFontSize(19);
+    documento.text(nombreTorneo.toUpperCase(), 148, 15, {
+      align: "center",
+    });
+
+    documento.setFontSize(14);
+    documento.text(subtitulo.toUpperCase(), 148, 24, {
+      align: "center",
+    });
+
+    documento.setFont("helvetica", "normal");
+    documento.setFontSize(10);
+
+    const informacion = [
+      lugarTorneo ? `Lugar: ${lugarTorneo}` : "",
+      fechaTorneo ? `Fecha: ${fechaTorneo}` : "",
+    ]
+      .filter(Boolean)
+      .join("    |    ");
+
+    if (informacion) {
+      documento.text(informacion, 148, 31, {
+        align: "center",
+      });
+    }
+  }
+
+  function crearFilasPDF(lista) {
+    return lista.map((resultado, indice) => [
       obtenerLugar(resultado, indice) || "—",
       resultado.codigo || "—",
       resultado.participante,
@@ -130,48 +358,234 @@ export default function ResultadosAdmin() {
       resultado.jurado_4 ?? "—",
       resultado.jurado_5 ?? "—",
       `${resultado.jurados_evaluados}/5`,
-      Number(resultado.jurados_evaluados) === 5 ? resultado.total_general : "Pendiente",
+      resultadoCompleto(resultado)
+        ? resultado.total_general
+        : "Pendiente",
     ]);
+  }
 
+  function agregarTablaPDF(documento, lista, startY = 38) {
     autoTable(documento, {
-      startY: 40,
-      head: [["Lugar", "Código", "Competidor", "J1", "J2", "J3", "J4", "J5", "Evaluados", "Total"]],
-      body: filas,
+      startY,
+      head: [
+        [
+          "Lugar",
+          "Código",
+          "Competidor",
+          "J1",
+          "J2",
+          "J3",
+          "J4",
+          "J5",
+          "Evaluados",
+          "Total",
+        ],
+      ],
+      body: crearFilasPDF(lista),
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, halign: "center", valign: "middle" },
-      headStyles: { fillColor: [49, 46, 24], textColor: [245, 197, 66], fontStyle: "bold" },
-      columnStyles: { 2: { halign: "left", cellWidth: 58 } },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.5,
+        halign: "center",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [49, 46, 24],
+        textColor: [245, 197, 66],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        2: {
+          halign: "left",
+          cellWidth: 58,
+        },
+      },
+    });
+  }
+
+  function agregarFirmasPDF(documento) {
+    const finalY = documento.lastAutoTable?.finalY || 150;
+    const paginaAlto = documento.internal.pageSize.getHeight();
+    const posicionFirma = Math.min(finalY + 25, paginaAlto - 20);
+
+    documento.setFontSize(9);
+    documento.setFont("helvetica", "normal");
+
+    documento.line(25, posicionFirma, 90, posicionFirma);
+    documento.text("Firma organización", 57, posicionFirma + 5, {
+      align: "center",
     });
 
-    const finalY = documento.lastAutoTable?.finalY || 150;
-    documento.setFontSize(10);
-    documento.setFont("helvetica", "normal");
-    documento.line(25, finalY + 28, 90, finalY + 28);
-    documento.text("Firma organización", 57, finalY + 34, { align: "center" });
-    documento.line(205, finalY + 28, 270, finalY + 28);
-    documento.text("Firma jurado responsable", 237, finalY + 34, { align: "center" });
-    documento.save(`Resultados_${nombreArchivo}.pdf`);
+    documento.line(205, posicionFirma, 270, posicionFirma);
+    documento.text("Firma jurado responsable", 237, posicionFirma + 5, {
+      align: "center",
+    });
+  }
+
+  function exportarPDFCategoria() {
+    if (resultados.length === 0) {
+      alert("No existen resultados para exportar.");
+      return;
+    }
+
+    const documento = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    agregarCabeceraPDF(
+      documento,
+      `Resultados oficiales - ${nombreCategoria}`
+    );
+    agregarTablaPDF(documento, resultados);
+    agregarFirmasPDF(documento);
+
+    documento.save(
+      `Resultados_${limpiarNombreArchivo(nombreCategoria)}.pdf`
+    );
+  }
+
+  async function exportarPDFCompleto() {
+    if (categorias.length === 0) {
+      alert("No existen categorías para exportar.");
+      return;
+    }
+
+    setExportando(true);
+
+    try {
+      const datosCategorias = await obtenerTodasLasCategorias();
+
+      const documento = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      agregarCabeceraPDF(
+        documento,
+        "Resultados generales de la competencia"
+      );
+
+      const filasResumen = datosCategorias.map(
+        ({ categoria, resultados: lista }) => {
+          const completos = lista.filter(resultadoCompleto).length;
+          const total = lista.length;
+
+          return [
+            categoria.nombre,
+            total,
+            completos,
+            total > 0 && completos === total
+              ? "Completa"
+              : "Pendiente",
+          ];
+        }
+      );
+
+      autoTable(documento, {
+        startY: 38,
+        head: [
+          [
+            "Categoría",
+            "Competidores",
+            "Completos",
+            "Estado",
+          ],
+        ],
+        body: filasResumen,
+        theme: "grid",
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+          halign: "center",
+        },
+        headStyles: {
+          fillColor: [49, 46, 24],
+          textColor: [245, 197, 66],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { halign: "left", cellWidth: 85 },
+        },
+      });
+
+      datosCategorias.forEach(
+        ({ categoria, resultados: lista }) => {
+          documento.addPage("a4", "landscape");
+          agregarCabeceraPDF(
+            documento,
+            `Resultados oficiales - ${categoria.nombre}`
+          );
+          agregarTablaPDF(documento, lista);
+          agregarFirmasPDF(documento);
+        }
+      );
+
+      documento.save(
+        `Resultados_Completos_${limpiarNombreArchivo(nombreTorneo)}.pdf`
+      );
+    } catch (errorExportacion) {
+      console.error(errorExportacion);
+      alert(errorExportacion.message);
+    } finally {
+      setExportando(false);
+    }
   }
 
   return (
-    <div style={{ minHeight: "100vh", padding: "35px 20px", boxSizing: "border-box", background: "#111827", color: "white", fontFamily: "Arial, Helvetica, sans-serif" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "35px 20px",
+        boxSizing: "border-box",
+        background: "#111827",
+        color: "white",
+        fontFamily: "Arial, Helvetica, sans-serif",
+      }}
+    >
       <div style={{ maxWidth: "1300px", margin: "0 auto" }}>
         <NavbarAdmin />
 
-        <button onClick={() => navigate("/administrador")} style={estiloBotonVolver}>
+        <button
+          onClick={() => navigate("/administrador")}
+          style={estiloBotonVolver}
+        >
           ← Volver al administrador
         </button>
 
-        <h1 style={{ color: "#f5c542", fontSize: "42px", marginBottom: "8px" }}>
-          Resultados detallados
+        <h1
+          style={{
+            color: "#f5c542",
+            fontSize: "42px",
+            marginBottom: "8px",
+          }}
+        >
+          Resultados y exportación
         </h1>
 
         <p style={{ color: "#d1d5db", fontSize: "18px" }}>
-          Puntajes emitidos por cada jurado
+          Descarga una categoría o toda la competencia en Excel y PDF.
         </p>
 
-        <section style={{ marginTop: "25px", marginBottom: "22px", padding: "20px", background: "#1f2937", borderRadius: "14px" }}>
-          <label htmlFor="categoria-resultados" style={{ display: "block", marginBottom: "10px", fontSize: "18px" }}>
+        <section
+          style={{
+            marginTop: "25px",
+            marginBottom: "22px",
+            padding: "20px",
+            background: "#1f2937",
+            borderRadius: "14px",
+          }}
+        >
+          <label
+            htmlFor="categoria-resultados"
+            style={{
+              display: "block",
+              marginBottom: "10px",
+              fontSize: "18px",
+            }}
+          >
             Categoría
           </label>
 
@@ -182,7 +596,13 @@ export default function ResultadosAdmin() {
               setCategoriaId(evento.target.value);
               setCargando(true);
             }}
-            style={{ width: "100%", padding: "14px", border: "2px solid #f5c542", borderRadius: "10px", fontSize: "19px" }}
+            style={{
+              width: "100%",
+              padding: "14px",
+              border: "2px solid #f5c542",
+              borderRadius: "10px",
+              fontSize: "19px",
+            }}
           >
             {categorias.map((categoria) => (
               <option key={categoria.id} value={categoria.id}>
@@ -192,39 +612,123 @@ export default function ResultadosAdmin() {
           </select>
         </section>
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "15px", marginBottom: "28px" }}>
+        <h3 style={{ color: "#f5c542" }}>Exportar categoría seleccionada</h3>
+
+        <section style={estiloGrupoBotones}>
           <button
-            onClick={exportarExcel}
+            onClick={exportarExcelCategoria}
             disabled={cargando || resultados.length === 0}
-            style={{ ...estiloBotonExportar, background: "#15803d", opacity: cargando || resultados.length === 0 ? 0.6 : 1 }}
+            style={{
+              ...estiloBotonExportar,
+              background: "#15803d",
+              opacity:
+                cargando || resultados.length === 0 ? 0.6 : 1,
+            }}
           >
-            📊 Descargar Excel
+            📊 Excel de esta categoría
           </button>
 
           <button
-            onClick={exportarPDF}
+            onClick={exportarPDFCategoria}
             disabled={cargando || resultados.length === 0}
-            style={{ ...estiloBotonExportar, background: "#b91c1c", opacity: cargando || resultados.length === 0 ? 0.6 : 1 }}
+            style={{
+              ...estiloBotonExportar,
+              background: "#b91c1c",
+              opacity:
+                cargando || resultados.length === 0 ? 0.6 : 1,
+            }}
           >
-            📄 Descargar PDF
+            📄 PDF de esta categoría
           </button>
         </section>
 
-        <h2 style={{ textAlign: "center", color: "#f5c542", fontSize: "34px" }}>
+        <h3 style={{ color: "#f5c542", marginTop: "28px" }}>
+          Exportar competencia completa
+        </h3>
+
+        <section style={estiloGrupoBotones}>
+          <button
+            onClick={exportarExcelCompleto}
+            disabled={exportando || categorias.length === 0}
+            style={{
+              ...estiloBotonExportar,
+              background: "#166534",
+              opacity: exportando ? 0.6 : 1,
+            }}
+          >
+            📊 Excel con todas las categorías
+          </button>
+
+          <button
+            onClick={exportarPDFCompleto}
+            disabled={exportando || categorias.length === 0}
+            style={{
+              ...estiloBotonExportar,
+              background: "#991b1b",
+              opacity: exportando ? 0.6 : 1,
+            }}
+          >
+            📄 PDF con toda la competencia
+          </button>
+        </section>
+
+        {exportando && (
+          <p
+            style={{
+              padding: "14px",
+              marginTop: "18px",
+              background: "#1e3a8a",
+              borderRadius: "10px",
+              textAlign: "center",
+            }}
+          >
+            Preparando archivo completo...
+          </p>
+        )}
+
+        <h2
+          style={{
+            textAlign: "center",
+            color: "#f5c542",
+            fontSize: "34px",
+            marginTop: "35px",
+          }}
+        >
           {nombreCategoria}
         </h2>
 
         {cargando && <p>Cargando resultados...</p>}
 
         {error && (
-          <p style={{ padding: "15px", background: "#7f1d1d", color: "#fecaca", borderRadius: "10px" }}>
+          <p
+            style={{
+              padding: "15px",
+              background: "#7f1d1d",
+              color: "#fecaca",
+              borderRadius: "10px",
+            }}
+          >
             {error}
           </p>
         )}
 
         {!cargando && !error && (
-          <div style={{ overflowX: "auto", marginTop: "25px", borderRadius: "14px", border: "1px solid #4b5563" }}>
-            <table style={{ width: "100%", minWidth: "1100px", borderCollapse: "collapse", background: "#1f2937" }}>
+          <div
+            style={{
+              overflowX: "auto",
+              marginTop: "25px",
+              borderRadius: "14px",
+              border: "1px solid #4b5563",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                minWidth: "1100px",
+                borderCollapse: "collapse",
+                background: "#1f2937",
+              }}
+            >
               <thead>
                 <tr style={{ background: "#312e18" }}>
                   <th style={estiloEncabezado}>Lugar</th>
@@ -236,7 +740,15 @@ export default function ResultadosAdmin() {
                   <th style={estiloEncabezado}>Jurado 4</th>
                   <th style={estiloEncabezado}>
                     Jurado 5
-                    <div style={{ color: "#f5c542", fontSize: "12px", marginTop: "4px" }}>Incógnito</div>
+                    <div
+                      style={{
+                        color: "#f5c542",
+                        fontSize: "12px",
+                        marginTop: "4px",
+                      }}
+                    >
+                      Incógnito
+                    </div>
                   </th>
                   <th style={estiloEncabezado}>Evaluados</th>
                   <th style={estiloEncabezado}>Total</th>
@@ -245,33 +757,84 @@ export default function ResultadosAdmin() {
 
               <tbody>
                 {resultados.map((resultado, indice) => {
-                  const completo = Number(resultado.jurados_evaluados) === 5;
+                  const completo = resultadoCompleto(resultado);
 
                   return (
                     <tr
                       key={resultado.participante_id}
                       style={{
-                        background: indice === 0 && completo ? "#4c3a0a" : "#1f2937",
+                        background:
+                          indice === 0 && completo
+                            ? "#4c3a0a"
+                            : "#1f2937",
                         borderBottom: "1px solid #374151",
                       }}
                     >
-                      <td style={estiloCelda}>{completo ? `${indice + 1}°` : "—"}</td>
-                      <td style={{ ...estiloCelda, color: "#f5c542", fontWeight: "bold", fontSize: "18px" }}>
+                      <td style={estiloCelda}>
+                        {completo ? `${indice + 1}°` : "—"}
+                      </td>
+
+                      <td
+                        style={{
+                          ...estiloCelda,
+                          color: "#f5c542",
+                          fontWeight: "bold",
+                          fontSize: "18px",
+                        }}
+                      >
                         {resultado.codigo || "—"}
                       </td>
-                      <td style={{ ...estiloCelda, textAlign: "left", fontWeight: "bold", fontSize: "18px" }}>
+
+                      <td
+                        style={{
+                          ...estiloCelda,
+                          textAlign: "left",
+                          fontWeight: "bold",
+                          fontSize: "18px",
+                        }}
+                      >
                         {resultado.participante}
                       </td>
-                      <td style={estiloCelda}>{resultado.jurado_1 ?? "—"}</td>
-                      <td style={estiloCelda}>{resultado.jurado_2 ?? "—"}</td>
-                      <td style={estiloCelda}>{resultado.jurado_3 ?? "—"}</td>
-                      <td style={estiloCelda}>{resultado.jurado_4 ?? "—"}</td>
-                      <td style={{ ...estiloCelda, color: "#f5c542", fontWeight: "bold" }}>
+
+                      <td style={estiloCelda}>
+                        {resultado.jurado_1 ?? "—"}
+                      </td>
+                      <td style={estiloCelda}>
+                        {resultado.jurado_2 ?? "—"}
+                      </td>
+                      <td style={estiloCelda}>
+                        {resultado.jurado_3 ?? "—"}
+                      </td>
+                      <td style={estiloCelda}>
+                        {resultado.jurado_4 ?? "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...estiloCelda,
+                          color: "#f5c542",
+                          fontWeight: "bold",
+                        }}
+                      >
                         {resultado.jurado_5 ?? "?"}
                       </td>
-                      <td style={estiloCelda}>{resultado.jurados_evaluados} / 5</td>
-                      <td style={{ ...estiloCelda, color: completo ? "#f5c542" : "#d1d5db", fontWeight: "bold", fontSize: "22px" }}>
-                        {completo ? resultado.total_general : "Pendiente"}
+
+                      <td style={estiloCelda}>
+                        {resultado.jurados_evaluados} / 5
+                      </td>
+
+                      <td
+                        style={{
+                          ...estiloCelda,
+                          color: completo
+                            ? "#f5c542"
+                            : "#d1d5db",
+                          fontWeight: "bold",
+                          fontSize: "22px",
+                        }}
+                      >
+                        {completo
+                          ? resultado.total_general
+                          : "Pendiente"}
                       </td>
                     </tr>
                   );
@@ -292,6 +855,13 @@ const estiloBotonVolver = {
   border: "1px solid #6b7280",
   borderRadius: "8px",
   cursor: "pointer",
+};
+
+const estiloGrupoBotones = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+  gap: "15px",
+  marginBottom: "15px",
 };
 
 const estiloBotonExportar = {
