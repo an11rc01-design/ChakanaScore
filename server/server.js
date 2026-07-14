@@ -557,7 +557,30 @@ app.post("/torneo", (req, res) => {
   );
 });
 const PORT = process.env.PORT || 3001;
+app.post("/admin/reiniciar-puntajes", (req, res) => {
+  const { clave } = req.body;
 
+  if (clave !== "CHAKANA2026") {
+    return res.status(403).json({
+      error: "Clave incorrecta.",
+    });
+  }
+
+  db.run("DELETE FROM puntajes", function (err) {
+    if (err) {
+      console.error(err);
+
+      return res.status(500).json({
+        error: "No se pudieron reiniciar las evaluaciones.",
+      });
+    }
+
+    res.json({
+      mensaje: "Todas las evaluaciones fueron eliminadas.",
+      eliminadas: this.changes,
+    });
+  });
+});
 app.listen(PORT, () => {
   console.log(`✅ Servidor iniciado en el puerto ${PORT}`);
 });
