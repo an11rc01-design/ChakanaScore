@@ -346,53 +346,53 @@ export default function Publico() {
                   </div>
                 </div>
 
-                <div style={{ textAlign: "center" }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#d1d5db",
-                    }}
-                  >
-                    4 jurados visibles
-                  </p>
+                <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(5,1fr)",
+    gap: "12px",
+    gridColumn: "3 / span 2",
+  }}
+>
+  {[
+    { nombre: "J1", valor: resultado.jurado_1 },
+    { nombre: "J2", valor: resultado.jurado_2 },
+    { nombre: "J3", valor: resultado.jurado_3 },
+    { nombre: "J4", valor: resultado.jurado_4 },
+  ].map((j) => (
+    <div
+      key={j.nombre}
+      style={{
+        background: "#111827",
+        border: "2px solid #f5c542",
+        borderRadius: "12px",
+        padding: "12px",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          color: "#f5c542",
+          fontWeight: "bold",
+          fontSize: "18px",
+        }}
+      >
+        {j.nombre}
+      </div>
 
-                  <strong
-                    style={{
-                      display: "block",
-                      marginTop: "6px",
-                      fontSize: "34px",
-                    }}
-                  >
-                    {tienePuntaje
-                      ? resultado.total_visible
-                      : "—"}
-                  </strong>
-                </div>
-
-                <div style={{ textAlign: "center" }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#d1d5db",
-                    }}
-                  >
-                    Jurado incógnito
-                  </p>
-
-                  <strong
-                    style={{
-                      display: "block",
-                      marginTop: "6px",
-                      color: "#f5c542",
-                      fontSize: "34px",
-                    }}
-                  >
-                    {completo
-                      ? resultado.total_incognito
-                      : "?"}
-                  </strong>
-                </div>
-
+      <div
+        style={{
+          marginTop: "8px",
+          fontSize: "32px",
+          fontWeight: "bold",
+          color: "white",
+        }}
+      >
+        {j.valor ?? "-"}
+      </div>
+    </div>
+  ))}
+</div>
                 {completo && (
                   <div
                     style={{
@@ -410,19 +410,19 @@ export default function Publico() {
                         fontSize: "18px",
                       }}
                     >
-                      Puntaje final
+                      Puntaje Visible
                     </p>
 
                     <strong
-                      style={{
-                        display: "block",
-                        marginTop: "7px",
-                        color: "#f5c542",
-                        fontSize: "52px",
-                      }}
-                    >
-                      {resultado.total_general}
-                    </strong>
+  style={{
+    display: "block",
+    marginTop: "7px",
+    color: "#f5c542",
+    fontSize: "52px",
+  }}
+>
+  {resultado.total_visible}
+</strong>
 
                     {indice === 0 && (
                       <p
