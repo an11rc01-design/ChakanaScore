@@ -569,9 +569,9 @@ app.post("/torneo", (req, res) => {
 });
 const PORT = process.env.PORT || 3001;
 app.post("/admin/reiniciar-puntajes", (req, res) => {
-  const { clave } = req.body;
+  const claveIngresada = String(req.body.clave || "").trim();
 
-  {
+  if (claveIngresada !== "CHAKANA2026") {
     return res.status(403).json({
       error: "Clave incorrecta.",
     });
@@ -582,13 +582,13 @@ app.post("/admin/reiniciar-puntajes", (req, res) => {
       console.error(err);
 
       return res.status(500).json({
-        error: "No se pudieron reiniciar las evaluaciones.",
+        error: "No se pudieron eliminar las evaluaciones.",
       });
     }
 
     res.json({
-      mensaje: "Todas las evaluaciones fueron eliminadas.",
-      eliminadas: this.changes,
+      mensaje: "Torneo reiniciado correctamente.",
+      evaluaciones_eliminadas: this.changes,
     });
   });
 });
