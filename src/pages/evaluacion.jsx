@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+const API_URL = "https://chakanascore.onrender.com";
+
 const criterios = [
   {
     campo: "danza",
@@ -32,6 +34,8 @@ export default function Evaluacion() {
   const nombreJurado =
     localStorage.getItem("nombreJurado") || "Jurado no identificado";
 
+  const [participante, setParticipante] = useState(null);
+
   const [puntajes, setPuntajes] = useState({
     danza: 1,
     creatividad: 1,
@@ -44,16 +48,31 @@ export default function Evaluacion() {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [bloqueada, setBloqueada] = useState(false);
-  const [participante, setParticipante] = useState(null);
   const [verificando, setVerificando] = useState(true);
 
   useEffect(() => {
-    useEffect(() => {
-  fetch(`https://chakanascore.onrender.com/participante/${participanteId}`)
-    .then((r) => r.json())
-    .then((data) => setParticipante(data))
-    .catch(console.error);
-}, [participanteId]);
+    async function cargarParticipante() {
+      try {
+        const respuesta = await fetch(
+          `${API_URL}/participante/${participanteId}`
+        );
+
+        if (!respuesta.ok) {
+          throw new Error("No se pudo cargar el competidor.");
+        }
+
+        const datos = await respuesta.json();
+        setParticipante(datos);
+      } catch (error) {
+        console.error(error);
+        setMensaje(`❌ ${error.message}`);
+      }
+    }
+
+    cargarParticipante();
+  }, [participanteId]);
+
+  useEffect(() => {
     async function verificarEvaluacion() {
       try {
         if (!juradoId) {
@@ -62,7 +81,7 @@ export default function Evaluacion() {
         }
 
         const respuesta = await fetch(
-          `https://chakanascore.onrender.com/puntajes/${participanteId}/${juradoId}`
+          `${API_URL}/puntajes/${participanteId}/${juradoId}`
         );
 
         if (!respuesta.ok) {
@@ -76,7 +95,7 @@ export default function Evaluacion() {
         }
       } catch (error) {
         console.error(error);
-        setMensaje("❌ No se pudo verificar la evaluación.");
+        setMensaje(`❌ ${error.message}`);
       } finally {
         setVerificando(false);
       }
@@ -108,11 +127,16 @@ export default function Evaluacion() {
       return;
     }
 
+    if (!juradoId) {
+      setMensaje("❌ No se pudo identificar al jurado.");
+      return;
+    }
+
     setGuardando(true);
     setMensaje("");
 
     try {
-      const respuesta = await fetch("https://chakanascore.onrender.com/puntajes", {
+      const respuesta = await fetch(`${API_URL}/puntajes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -127,7 +151,9 @@ export default function Evaluacion() {
       const resultado = await respuesta.json();
 
       if (!respuesta.ok) {
-        throw new Error(resultado.error || "No se pudo guardar.");
+        throw new Error(
+          resultado.error || "No se pudo guardar la evaluación."
+        );
       }
 
       setBloqueada(true);
@@ -135,8 +161,11 @@ export default function Evaluacion() {
         `✅ Evaluación guardada. Total: ${resultado.total} puntos`
       );
 
-      setTimeout(() => navigate(-1), 900);
+      setTimeout(() => {
+        navigate(-1);
+      }, 1000);
     } catch (error) {
+      console.error(error);
       setMensaje(`❌ ${error.message}`);
     } finally {
       setGuardando(false);
@@ -152,6 +181,7 @@ export default function Evaluacion() {
           color: "white",
           display: "grid",
           placeItems: "center",
+          fontFamily: "Arial, Helvetica, sans-serif",
         }}
       >
         <p>Verificando evaluación...</p>
@@ -164,8 +194,10 @@ export default function Evaluacion() {
       style={{
         minHeight: "100vh",
         padding: "35px 20px",
+        boxSizing: "border-box",
         background: "#111827",
         color: "white",
+        fontFamily: "Arial, Helvetica, sans-serif",
       }}
     >
       <div
@@ -191,6 +223,7 @@ export default function Evaluacion() {
         <h2
           style={{
             marginTop: "25px",
+            marginBottom: "5px",
             fontWeight: "normal",
           }}
         >
@@ -201,44 +234,52 @@ export default function Evaluacion() {
           style={{
             color: "#f5c542",
             fontSize: "40px",
-            marginBottom: "5px",
+            margin: "8px 0 20px",
           }}
         >
           Rúbrica de evaluación
         </h1>
 
-        <h3
-  style={{
-    marginTop: 0,
-    color: "#9ca3af",
-    textAlign: "center",
-  }}
->
-  {participante?.categoria}
-</h3>
+        <section
+          style={{
+            padding: "22px",
+            background: "#1f2937",
+            border: "1px solid #374151",
+            borderRadius: "16px",
+            textAlign: "center",
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              color: "#d1d5db",
+              fontSize: "22px",
+            }}
+          >
+            {participante?.categoria || "Cargando categoría..."}
+          </h3>
 
-<h1
-  style={{
-    fontSize: "90px",
-    textAlign: "center",
-    color: "#f5c542",
-    marginTop: "5px",
-    marginBottom: "5px",
-    letterSpacing: "4px",
-  }}
->
-  {participante?.codigo}
-</h1>
+          <h1
+            style={{
+              margin: "10px 0 5px",
+              color: "#f5c542",
+              fontSize: "clamp(58px, 12vw, 90px)",
+              letterSpacing: "4px",
+            }}
+          >
+            {participante?.codigo || `N.º ${participanteId}`}
+          </h1>
 
-<p
-  style={{
-    textAlign: "center",
-    color: "#6b7280",
-    marginBottom: "30px",
-  }}
->
-  {participante?.nombre}
-</p>
+          <p
+            style={{
+              margin: 0,
+              color: "#9ca3af",
+              fontSize: "17px",
+            }}
+          >
+            {participante?.nombre || "Cargando competidor..."}
+          </p>
+        </section>
 
         {bloqueada ? (
           <div
@@ -275,13 +316,13 @@ export default function Evaluacion() {
           <>
             <div
               style={{
-                marginTop: "30px",
+                marginTop: "25px",
                 background: "#1f2937",
                 borderRadius: "16px",
                 padding: "24px",
               }}
             >
-              {criterios.map((criterio) => (
+              {criterios.map((criterio, indice) => (
                 <div
                   key={criterio.campo}
                   style={{
@@ -291,10 +332,14 @@ export default function Evaluacion() {
                     gap: "20px",
                     alignItems: "center",
                     padding: "16px 0",
-                    borderBottom: "1px solid #374151",
+                    borderBottom:
+                      indice < criterios.length - 1
+                        ? "1px solid #374151"
+                        : "none",
                   }}
                 >
                   <label
+                    htmlFor={criterio.campo}
                     style={{
                       fontSize: "18px",
                       lineHeight: 1.4,
@@ -304,6 +349,7 @@ export default function Evaluacion() {
                   </label>
 
                   <select
+                    id={criterio.campo}
                     value={puntajes[criterio.campo]}
                     onChange={(evento) =>
                       cambiarPuntaje(
@@ -340,20 +386,18 @@ export default function Evaluacion() {
                   paddingTop: "20px",
                 }}
               >
-                <label style={{ fontSize: "18px" }}>
+                <label htmlFor="descuento" style={{ fontSize: "18px" }}>
                   Descuentos extras
                 </label>
 
                 <input
+                  id="descuento"
                   type="number"
                   min="0"
                   max="50"
                   value={puntajes.descuento}
                   onChange={(evento) =>
-                    cambiarPuntaje(
-                      "descuento",
-                      evento.target.value
-                    )
+                    cambiarPuntaje("descuento", evento.target.value)
                   }
                   style={{
                     width: "100%",
