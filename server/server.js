@@ -15,12 +15,14 @@ app.get("/", (req, res) => {
 // Categorías
 app.get("/categorias", (req, res) => {
   db.all(
-    "SELECT
-    id,
-    nombre,
-    COALESCE(cerrada,0) AS cerrada
-FROM categorias
-ORDER BY id",
+    `
+    SELECT
+      id,
+      nombre,
+      COALESCE(cerrada, 0) AS cerrada
+    FROM categorias
+    ORDER BY id
+    `,
     (err, rows) => {
       if (err) {
         console.error(err);
@@ -79,34 +81,6 @@ app.get("/jurados", (req, res) => {
       }
 
       res.json(rows);
-    }
-  );
-});
-
-// Consultar si un jurado ya evaluó a un participante
-app.get("/puntajes/:participante/:jurado", (req, res) => {
-  const { participante, jurado } = req.params;
-
-  db.get(
-    `
-    SELECT *
-    FROM puntajes
-    WHERE participante_id = ?
-      AND jurado_id = ?
-    ORDER BY id DESC
-    LIMIT 1
-    `,
-    [participante, jurado],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-
-        return res.status(500).json({
-          error: "No se pudo revisar la evaluación.",
-        });
-      }
-
-      res.json(row || null);
     }
   );
 });
@@ -620,37 +594,7 @@ app.post("/admin/reiniciar-puntajes", (req, res) => {
     });
   });
 });
-app.post("/admin/reiniciar-puntajes", (req, res) => {
-  const claveIngresada = String(req.body.clave || "");
-  const claveCorrecta = process.env.ADMIN_RESET_KEY;
 
-  if (!claveCorrecta) {
-    return res.status(500).json({
-      error: "La clave de reinicio no está configurada en el servidor.",
-    });
-  }
-
-  if (claveIngresada !== claveCorrecta) {
-    return res.status(403).json({
-      error: "Clave incorrecta.",
-    });
-  }
-
-  db.run("DELETE FROM puntajes", function (err) {
-    if (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        error: "No se pudieron eliminar las evaluaciones.",
-      });
-    }
-
-    res.json({
-      mensaje: "Torneo reiniciado correctamente.",
-      evaluaciones_eliminadas: this.changes,
-    });
-  });
-});
 app.post("/publicar", (req, res) => {
 
     const { participante_id } = req.body;
