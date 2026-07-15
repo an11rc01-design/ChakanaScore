@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import logoWiracocha from "../assets/logo-wiracocha.jpeg";
+
 import flyerChakana from "../assets/flyer-chakana.jpeg";
 
 const API_URL = "https://chakanascore.onrender.com";
@@ -110,11 +110,13 @@ export default function Login() {
       >
         <img
   src="/logo-wiracocha.jpeg"
-  alt="Logo"
+  alt="Producciones Wiracocha"
   style={{
     width: "150px",
     height: "150px",
     objectFit: "contain",
+    borderRadius: "50%",
+    marginBottom: "10px",
   }}
 />
 
