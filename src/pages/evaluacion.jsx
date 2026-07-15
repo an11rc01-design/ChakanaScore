@@ -90,9 +90,22 @@ export default function Evaluacion() {
 
         const evaluacionExistente = await respuesta.json();
 
-        if (evaluacionExistente !== null) {
-          setBloqueada(true);
-        }
+        if (evaluacionExistente?.id) {
+
+  setPuntajes({
+    danza: evaluacionExistente.danza,
+    creatividad: evaluacionExistente.creatividad,
+    espacio: evaluacionExistente.espacio,
+    mensaje: evaluacionExistente.mensaje,
+    interpretacion: evaluacionExistente.interpretacion,
+    descuento: evaluacionExistente.descuento,
+  });
+
+  if (evaluacionExistente.categoria_cerrada == 1) {
+    setBloqueada(true);
+  }
+
+}
       } catch (error) {
         console.error(error);
         setMensaje(`❌ ${error.message}`);
@@ -281,7 +294,7 @@ export default function Evaluacion() {
           </p>
         </section>
 
-        {bloqueada ? (
+        {bloqueada && participante?.categoria_cerrada === 1 ? (
           <div
             style={{
               marginTop: "30px",
@@ -457,9 +470,9 @@ export default function Evaluacion() {
                 cursor: guardando ? "not-allowed" : "pointer",
               }}
             >
-              {guardando
-                ? "Guardando evaluación..."
-                : "Guardar evaluación"}
+             {guardando
+  ? "Guardando..."
+  : "Guardar / Actualizar evaluación"}
             </button>
           </>
         )}
