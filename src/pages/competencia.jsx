@@ -216,18 +216,12 @@ export default function Competencia() {
 </p>
 
               <button
-  onClick={() =>
-    navigate(`/evaluacion/${participante.id}`)
-  }
+  onClick={() => navigate(`/evaluacion/${participante.id}`)}
   style={{
     width: "100%",
     padding: "13px",
-    background: participante.evaluado
-      ? "#166534"
-      : "#f5c542",
-    color: participante.evaluado
-      ? "white"
-      : "#111827",
+    background: "#f5c542",
+    color: "#111827",
     border: "none",
     borderRadius: "8px",
     fontSize: "17px",
@@ -235,9 +229,7 @@ export default function Competencia() {
     cursor: "pointer",
   }}
 >
-  {participante.evaluado
-    ? "✏️ Editar evaluación"
-    : "Calificar"}
+  Calificar / Editar evaluación
 </button>
             </div>
           ))}
