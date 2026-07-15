@@ -414,28 +414,7 @@ export default function ResultadosAdmin() {
   documento.line(12, 40, 285, 40);
 }
 
-    documento.setFontSize(14);
-    documento.text(subtitulo.toUpperCase(), 148, 24, {
-      align: "center",
-    });
-
-    documento.setFont("helvetica", "normal");
-    documento.setFontSize(10);
-
-    const informacion = [
-      lugarTorneo ? `Lugar: ${lugarTorneo}` : "",
-      fechaTorneo ? `Fecha: ${fechaTorneo}` : "",
-    ]
-      .filter(Boolean)
-      .join("    |    ");
-
-    if (informacion) {
-      documento.text(informacion, 148, 31, {
-        align: "center",
-      });
-    }
-  }
-
+  
   function crearFilasPDF(lista) {
     return lista.map((resultado, indice) => [
       obtenerLugar(resultado, indice) || "—",
