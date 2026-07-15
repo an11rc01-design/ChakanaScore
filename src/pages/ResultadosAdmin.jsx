@@ -4,8 +4,29 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import NavbarAdmin from "../components/NavbarAdmin";
+import logoWiracocha from "../assets/logo-wiracocha.jpeg";
 
 const API_URL = "https://chakanascore.onrender.com";
+async function convertirImagenADataURL(rutaImagen) {
+  const respuesta = await fetch(rutaImagen);
+
+  if (!respuesta.ok) {
+    throw new Error("No se pudo cargar el logo.");
+  }
+
+  const blob = await respuesta.blob();
+
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+
+    lector.onloadend = () => resolve(lector.result);
+    lector.onerror = () => reject(
+      new Error("No se pudo convertir el logo.")
+    );
+
+    lector.readAsDataURL(blob);
+  });
+}
 
 export default function ResultadosAdmin() {
   const navigate = useNavigate();
@@ -318,12 +339,80 @@ export default function ResultadosAdmin() {
     }
   }
 
-  function agregarCabeceraPDF(documento, subtitulo) {
-    documento.setFont("helvetica", "bold");
-    documento.setFontSize(19);
-    documento.text(nombreTorneo.toUpperCase(), 148, 15, {
+  async function agregarCabeceraPDF(documento, subtitulo) {
+  try {
+    const logoBase64 = await convertirImagenADataURL(
+      logoWiracocha
+    );
+
+    documento.addImage(
+      logoBase64,
+      "JPEG",
+      12,
+      7,
+      30,
+      30
+    );
+
+    documento.addImage(
+      logoBase64,
+      "JPEG",
+      255,
+      7,
+      30,
+      30
+    );
+  } catch (errorLogo) {
+    console.error("Error cargando logo en PDF:", errorLogo);
+  }
+
+  documento.setFont("helvetica", "bold");
+  documento.setFontSize(19);
+
+  documento.text(
+    "PRODUCCIONES WIRACOCHA",
+    148,
+    13,
+    { align: "center" }
+  );
+
+  documento.setFontSize(17);
+
+  documento.text(
+    nombreTorneo.toUpperCase(),
+    148,
+    21,
+    { align: "center" }
+  );
+
+  documento.setFontSize(13);
+
+  documento.text(
+    subtitulo.toUpperCase(),
+    148,
+    29,
+    { align: "center" }
+  );
+
+  documento.setFont("helvetica", "normal");
+  documento.setFontSize(10);
+
+  const informacion = [
+    lugarTorneo ? `Lugar: ${lugarTorneo}` : "",
+    fechaTorneo ? `Fecha: ${fechaTorneo}` : "",
+  ]
+    .filter(Boolean)
+    .join("    |    ");
+
+  if (informacion) {
+    documento.text(informacion, 148, 36, {
       align: "center",
     });
+  }
+
+  documento.setDrawColor(184, 126, 45);
+  documento.line(12, 40, 285, 40);
+}
 
     documento.setFontSize(14);
     documento.text(subtitulo.toUpperCase(), 148, 24, {
@@ -422,7 +511,7 @@ export default function ResultadosAdmin() {
     });
   }
 
-  function exportarPDFCategoria() {
+  async function exportarPDFCategoria() {
     if (resultados.length === 0) {
       alert("No existen resultados para exportar.");
       return;
@@ -434,10 +523,10 @@ export default function ResultadosAdmin() {
       format: "a4",
     });
 
-    agregarCabeceraPDF(
-      documento,
-      `Resultados oficiales - ${nombreCategoria}`
-    );
+    await agregarCabeceraPDF(
+  documento,
+  `Resultados oficiales - ${nombreCategoria}`
+);
     agregarTablaPDF(documento, resultados);
     agregarFirmasPDF(documento);
 
@@ -463,10 +552,10 @@ export default function ResultadosAdmin() {
         format: "a4",
       });
 
-      agregarCabeceraPDF(
-        documento,
-        "Resultados generales de la competencia"
-      );
+      await agregarCabeceraPDF(
+  documento,
+  "Resultados generales de la competencia"
+);
 
       const filasResumen = datosCategorias.map(
         ({ categoria, resultados: lista }) => {
@@ -511,17 +600,20 @@ export default function ResultadosAdmin() {
         },
       });
 
-      datosCategorias.forEach(
-        ({ categoria, resultados: lista }) => {
-          documento.addPage("a4", "landscape");
-          agregarCabeceraPDF(
-            documento,
-            `Resultados oficiales - ${categoria.nombre}`
-          );
-          agregarTablaPDF(documento, lista);
-          agregarFirmasPDF(documento);
-        }
-      );
+      for (const { categoria, resultados: lista } of datosCategorias) {
+
+  documento.addPage("a4", "landscape");
+
+  await agregarCabeceraPDF(
+    documento,
+    `Resultados oficiales - ${categoria.nombre}`
+  );
+
+  agregarTablaPDF(documento, lista);
+
+  agregarFirmasPDF(documento);
+
+}
 
       documento.save(
         `Resultados_Completos_${limpiarNombreArchivo(nombreTorneo)}.pdf`
