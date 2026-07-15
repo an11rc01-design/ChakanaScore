@@ -43,7 +43,7 @@ export default function Competencia() {
 
             return {
               ...participante,
-              evaluado: evaluacion !== null,
+              evaluado: Boolean(evaluacion?.id),
             };
           })
         );
