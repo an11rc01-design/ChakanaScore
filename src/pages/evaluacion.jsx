@@ -105,7 +105,6 @@ if (Number(evaluacionExistente?.categoria_cerrada) === 1) {
   setBloqueada(true);
 }
 
-}
       } catch (error) {
         console.error(error);
         setMensaje(`❌ ${error.message}`);
