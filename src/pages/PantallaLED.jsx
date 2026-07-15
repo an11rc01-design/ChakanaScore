@@ -214,109 +214,173 @@ export default function PantallaLED() {
 
         .bloque-categoria {
   position: absolute;
-  top: 31%;
-  left: 25%;
-  width: 50%;
-  height: 10.5%;
+  top: 29.5%;
+  left: 22%;
+  width: 56%;
+  height: 13%;
 
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 
-  text-align: center;
-  background: #070707;
+  background: #050505;
   border: 2px solid #c8951e;
   border-radius: 12px;
   overflow: hidden;
+  z-index: 5;
 }
 
 .bloque-categoria span {
   color: #eebc3e;
-  font-size: clamp(14px, 1.5vw, 27px);
+  font-size: clamp(14px, 1.45vw, 26px);
   font-weight: 900;
   line-height: 1;
 }
 
 .bloque-categoria strong {
-  width: 96%;
-  margin-top: 5px;
+  width: 95%;
+  margin-top: 7px;
+
   color: #f8f1df;
-  font-size: clamp(27px, 3.7vw, 63px);
+  font-size: clamp(28px, 3.8vw, 62px);
   line-height: 1;
+  text-align: center;
   text-transform: uppercase;
+
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-        /* =========================
-           COMPETIDOR
-        ========================= */
-
-        .bloque-competidor {
+.bloque-competidor {
   position: absolute;
-  top: 42.5%;
-  left: 23%;
-  width: 54%;
-  height: 7.5%;
+  top: 42.8%;
+  left: 21%;
+  width: 58%;
+  height: 8%;
 
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 
-  text-align: center;
-  background: #070707;
+  background: #050505;
   border: 2px solid #c8951e;
   border-radius: 11px;
   overflow: hidden;
+  z-index: 6;
 }
 
 .bloque-competidor span {
   color: #eebc3e;
-  font-size: clamp(10px, 1.05vw, 19px);
+  font-size: clamp(10px, 1vw, 18px);
   font-weight: 900;
   line-height: 1;
 }
 
 .bloque-competidor strong {
-  width: 96%;
-  margin-top: 4px;
+  width: 95%;
+  margin-top: 5px;
+
   color: white;
-  font-size: clamp(18px, 2.15vw, 36px);
+  font-size: clamp(17px, 2.1vw, 35px);
   line-height: 1;
+  text-align: center;
   text-transform: uppercase;
+
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-        /* =========================
-           JURADOS
-        ========================= */
-
-        .contenedor-jurados {
+.contenedor-jurados {
   position: absolute;
-  top: 52.8%;
-  left: 4%;
-  width: 92%;
+  top: 52%;
+  left: 3.8%;
+  width: 92.4%;
   height: 25%;
 
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1.2%;
+
+  z-index: 10;
 }
 
-        /* =========================
-           TOTAL
-        ========================= */
+.tarjeta {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
 
-        .bloque-total {
+  overflow: hidden;
+  background: #000;
+
+  border: 3px solid var(--color);
+  border-radius: 13px;
+
+  box-shadow:
+    0 0 12px var(--color),
+    0 10px 25px rgba(0, 0, 0, 0.9);
+}
+
+.encabezado-jurado {
+  width: 100%;
+  height: 20%;
+
+  display: grid;
+  place-items: center;
+
+  background: var(--fondo);
+  border-bottom: 1px solid var(--color);
+
+  color: white;
+  font-size: clamp(11px, 1.35vw, 24px);
+  font-weight: 900;
+  text-align: center;
+}
+
+.contenido-jurado {
+  width: 100%;
+  height: 80%;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  background: #000;
+}
+
+.numero {
+  color: #f8efdb;
+  font-size: clamp(52px, 6.8vw, 118px);
+  line-height: 1;
+
+  text-shadow:
+    0 5px 6px #000,
+    0 0 18px rgba(255, 211, 110, 0.3);
+}
+
+.candado {
+  font-size: clamp(40px, 4.5vw, 78px);
+  line-height: 1;
+  filter: grayscale(1) brightness(1.5);
+}
+
+.texto-incognito {
+  margin-top: 8px;
+
+  color: #dedede;
+  font-size: clamp(9px, 1.1vw, 19px);
+  font-weight: 900;
+}
+
+.bloque-total {
   position: absolute;
   top: 79.5%;
-  left: 29%;
-  width: 42%;
+  left: 27%;
+  width: 46%;
   height: 14%;
 
   display: flex;
@@ -324,25 +388,35 @@ export default function PantallaLED() {
   justify-content: center;
   align-items: center;
 
-  text-align: center;
-  background: #060504;
+  background: #050403;
   border: 3px solid #c8951e;
   border-radius: 14px;
   overflow: hidden;
+
+  box-shadow:
+    0 0 22px rgba(230, 171, 30, 0.35),
+    0 12px 25px rgba(0, 0, 0, 0.9);
+
+  z-index: 12;
 }
 
 .bloque-total span {
   color: #eebc3e;
-  font-size: clamp(15px, 1.65vw, 30px);
+  font-size: clamp(15px, 1.6vw, 28px);
   font-weight: 900;
   line-height: 1;
 }
 
 .bloque-total strong {
-  margin-top: 4px;
+  margin-top: 6px;
+
   color: #f8efdb;
-  font-size: clamp(48px, 6vw, 105px);
-  line-height: 0.88;
+  font-size: clamp(48px, 5.8vw, 100px);
+  line-height: 0.85;
+
+  text-shadow:
+    0 5px 6px #000,
+    0 0 18px rgba(255, 200, 80, 0.25);
 }
       `}</style>
     </main>
