@@ -109,7 +109,7 @@ export default function Login() {
         }}
       >
         <img
-  src="/logo-wiracocha.jpeg"
+  src="/logo-wiracocha.png"
   alt="Producciones Wiracocha"
   style={{
     width: "150px",
