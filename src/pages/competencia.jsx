@@ -239,7 +239,6 @@ export default function Competencia() {
     ? "✏️ Editar evaluación"
     : "Calificar"}
 </button>
-              )}
             </div>
           ))}
         </div>
