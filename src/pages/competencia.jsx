@@ -215,41 +215,30 @@ export default function Competencia() {
   {participante.nombre}
 </p>
 
-              {participante.evaluado ? (
-                <button
-                  disabled
-                  style={{
-                    width: "100%",
-                    padding: "13px",
-                    background: "#166534",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "17px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✅ Evaluado
-                </button>
-              ) : (
-                <button
-                  onClick={() =>
-                    navigate(`/evaluacion/${participante.id}`)
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "13px",
-                    background: "#f5c542",
-                    color: "#111827",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "17px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  Calificar
-                </button>
+              <button
+  onClick={() =>
+    navigate(`/evaluacion/${participante.id}`)
+  }
+  style={{
+    width: "100%",
+    padding: "13px",
+    background: participante.evaluado
+      ? "#166534"
+      : "#f5c542",
+    color: participante.evaluado
+      ? "white"
+      : "#111827",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "17px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  }}
+>
+  {participante.evaluado
+    ? "✏️ Editar evaluación"
+    : "Calificar"}
+</button>
               )}
             </div>
           ))}
