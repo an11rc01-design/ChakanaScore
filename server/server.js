@@ -85,7 +85,7 @@ app.get("/jurados", (req, res) => {
   );
 });
 
-// Guardar evaluación
+// Guardar o actualizar evaluación
 app.post("/puntajes", (req, res) => {
   const {
     participante_id,
@@ -98,37 +98,36 @@ app.post("/puntajes", (req, res) => {
     descuento = 0,
   } = req.body;
 
-  const criterios = [
-    danza,
-    creatividad,
-    espacio,
-    mensaje,
-    interpretacion,
-  ];
-
   const participanteId = Number(participante_id);
   const juradoId = Number(jurado_id);
-  const descuentoNumero = Number(descuento);
 
-  const criteriosValidos = criterios.every((valor) => {
-    const numero = Number(valor);
+  const valores = [
+    Number(danza),
+    Number(creatividad),
+    Number(espacio),
+    Number(mensaje),
+    Number(interpretacion),
+  ];
 
-    return (
-      Number.isInteger(numero) &&
-      numero >= 1 &&
-      numero <= 10
-    );
-  });
+  const descuentoFinal = Math.max(
+    0,
+    Number(descuento) || 0
+  );
+
+  const puntajesValidos = valores.every(
+    (valor) =>
+      Number.isInteger(valor) &&
+      valor >= 1 &&
+      valor <= 10
+  );
 
   if (
     !Number.isInteger(participanteId) ||
     !Number.isInteger(juradoId) ||
-    !criteriosValidos ||
-    !Number.isInteger(descuentoNumero) ||
-    descuentoNumero < 0
+    !puntajesValidos
   ) {
     return res.status(400).json({
-      error: "Los datos de la evaluación son inválidos.",
+      error: "Datos de evaluación inválidos.",
     });
   }
 
@@ -136,10 +135,9 @@ app.post("/puntajes", (req, res) => {
     `
     SELECT
       p.id,
-      p.categoria_id,
-      c.cerrada
+      COALESCE(c.cerrada, 0) AS cerrada
     FROM participantes p
-    JOIN categorias c
+    INNER JOIN categorias c
       ON c.id = p.categoria_id
     WHERE p.id = ?
     `,
@@ -162,70 +160,127 @@ app.post("/puntajes", (req, res) => {
       if (Number(participante.cerrada) === 1) {
         return res.status(403).json({
           error:
-            "La categoría está cerrada. No se pueden modificar evaluaciones.",
+            "La categoría está cerrada y no permite cambios.",
         });
       }
 
-      const total =
-        Number(danza) +
-        Number(creatividad) +
-        Number(espacio) +
-        Number(mensaje) +
-        Number(interpretacion) -
-        descuentoNumero;
+      const total = Math.max(
+        0,
+        valores.reduce(
+          (suma, valor) => suma + valor,
+          0
+        ) - descuentoFinal
+      );
 
-      db.run(
+      db.get(
         `
-        INSERT INTO puntajes (
-          participante_id,
-          jurado_id,
-          danza,
-          creatividad,
-          espacio,
-          mensaje,
-          interpretacion,
-          descuento,
-          total
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-
-        ON CONFLICT(participante_id, jurado_id)
-        DO UPDATE SET
-          danza = excluded.danza,
-          creatividad = excluded.creatividad,
-          espacio = excluded.espacio,
-          mensaje = excluded.mensaje,
-          interpretacion = excluded.interpretacion,
-          descuento = excluded.descuento,
-          total = excluded.total
+        SELECT id
+        FROM puntajes
+        WHERE participante_id = ?
+          AND jurado_id = ?
+        ORDER BY id DESC
+        LIMIT 1
         `,
-        [
-          participanteId,
-          juradoId,
-          Number(danza),
-          Number(creatividad),
-          Number(espacio),
-          Number(mensaje),
-          Number(interpretacion),
-          descuentoNumero,
-          total,
-        ],
-        function guardarEvaluacion(errorGuardado) {
-          if (errorGuardado) {
-            console.error(errorGuardado);
+        [participanteId, juradoId],
+        (errorConsulta, existente) => {
+          if (errorConsulta) {
+            console.error(errorConsulta);
 
             return res.status(500).json({
-              error: "No se pudo guardar la evaluación.",
+              error: "No se pudo revisar la evaluación.",
             });
           }
 
-          return res.json({
-            mensaje:
-              "Evaluación guardada o actualizada correctamente.",
-            participante_id: participanteId,
-            jurado_id: juradoId,
-            total,
-          });
+          if (existente) {
+            db.run(
+              `
+              UPDATE puntajes
+              SET
+                danza = ?,
+                creatividad = ?,
+                espacio = ?,
+                mensaje = ?,
+                interpretacion = ?,
+                descuento = ?,
+                total = ?
+              WHERE id = ?
+              `,
+              [
+                valores[0],
+                valores[1],
+                valores[2],
+                valores[3],
+                valores[4],
+                descuentoFinal,
+                total,
+                existente.id,
+              ],
+              function (errorActualizar) {
+                if (errorActualizar) {
+                  console.error(errorActualizar);
+
+                  return res.status(500).json({
+                    error:
+                      "No se pudo actualizar la evaluación.",
+                  });
+                }
+
+                return res.json({
+                  mensaje:
+                    "Evaluación actualizada correctamente.",
+                  total,
+                  actualizada: true,
+                });
+              }
+            );
+
+            return;
+          }
+
+          db.run(
+            `
+            INSERT INTO puntajes (
+              participante_id,
+              jurado_id,
+              danza,
+              creatividad,
+              espacio,
+              mensaje,
+              interpretacion,
+              descuento,
+              total
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+              participanteId,
+              juradoId,
+              valores[0],
+              valores[1],
+              valores[2],
+              valores[3],
+              valores[4],
+              descuentoFinal,
+              total,
+            ],
+            function (errorGuardar) {
+              if (errorGuardar) {
+                console.error(errorGuardar);
+
+                return res.status(500).json({
+                  error:
+                    "No se pudo guardar la evaluación.",
+                });
+              }
+
+              return res.status(201).json({
+                mensaje:
+                  "Evaluación guardada correctamente.",
+                total,
+                actualizada: false,
+              });
+            }
+          );
         }
       );
     }
