@@ -223,4 +223,52 @@ db.get(
 
     }
 );
+// =====================================================
+// MIGRACIÓN: CERRAR CATEGORÍAS Y EVITAR DUPLICADOS
+// =====================================================
+
+db.all("PRAGMA table_info(categorias)", (err, columnas) => {
+  if (err) {
+    console.error("Error revisando categorías:", err);
+    return;
+  }
+
+  const existeCerrada = columnas.some(
+    (columna) => columna.name === "cerrada"
+  );
+
+  if (!existeCerrada) {
+    db.run(
+      "ALTER TABLE categorias ADD COLUMN cerrada INTEGER DEFAULT 0",
+      (errorAlteracion) => {
+        if (errorAlteracion) {
+          console.error(
+            "Error agregando columna cerrada:",
+            errorAlteracion
+          );
+        } else {
+          console.log("✅ Columna cerrada agregada a categorías.");
+        }
+      }
+    );
+  }
+});
+
+db.run(
+  `
+  CREATE UNIQUE INDEX IF NOT EXISTS
+  idx_puntaje_participante_jurado
+  ON puntajes(participante_id, jurado_id)
+  `,
+  (err) => {
+    if (err) {
+      console.error(
+        "Error creando índice único de puntajes:",
+        err
+      );
+    } else {
+      console.log("✅ Puntajes protegidos contra duplicados.");
+    }
+  }
+);
 module.exports = db;

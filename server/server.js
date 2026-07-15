@@ -15,7 +15,12 @@ app.get("/", (req, res) => {
 // Categorías
 app.get("/categorias", (req, res) => {
   db.all(
-    "SELECT id, nombre FROM categorias ORDER BY id",
+    "SELECT
+    id,
+    nombre,
+    COALESCE(cerrada,0) AS cerrada
+FROM categorias
+ORDER BY id",
     (err, rows) => {
       if (err) {
         console.error(err);
@@ -116,73 +121,84 @@ app.post("/puntajes", (req, res) => {
     espacio,
     mensaje,
     interpretacion,
-    descuento,
+    descuento = 0,
   } = req.body;
+
+  const criterios = [
+    danza,
+    creatividad,
+    espacio,
+    mensaje,
+    interpretacion,
+  ];
 
   const participanteId = Number(participante_id);
   const juradoId = Number(jurado_id);
+  const descuentoNumero = Number(descuento);
 
-  const valores = [
-    Number(danza),
-    Number(creatividad),
-    Number(espacio),
-    Number(mensaje),
-    Number(interpretacion),
-  ];
+  const criteriosValidos = criterios.every((valor) => {
+    const numero = Number(valor);
 
-  const puntajesValidos = valores.every(
-    (valor) =>
-      Number.isInteger(valor) &&
-      valor >= 1 &&
-      valor <= 10
-  );
+    return (
+      Number.isInteger(numero) &&
+      numero >= 1 &&
+      numero <= 10
+    );
+  });
 
   if (
     !Number.isInteger(participanteId) ||
     !Number.isInteger(juradoId) ||
-    !puntajesValidos
+    !criteriosValidos ||
+    !Number.isInteger(descuentoNumero) ||
+    descuentoNumero < 0
   ) {
     return res.status(400).json({
-      error: "Datos de evaluación inválidos.",
+      error: "Los datos de la evaluación son inválidos.",
     });
   }
 
-  const descuentoFinal = Math.max(
-    0,
-    Number(descuento) || 0
-  );
-
-  const total = Math.max(
-    0,
-    valores.reduce((suma, valor) => suma + valor, 0) -
-      descuentoFinal
-  );
-
-  // Evita una segunda evaluación del mismo jurado
   db.get(
     `
-    SELECT id
-    FROM puntajes
-    WHERE participante_id = ?
-      AND jurado_id = ?
-    LIMIT 1
+    SELECT
+      p.id,
+      p.categoria_id,
+      c.cerrada
+    FROM participantes p
+    JOIN categorias c
+      ON c.id = p.categoria_id
+    WHERE p.id = ?
     `,
-    [participanteId, juradoId],
-    (errorConsulta, evaluacionExistente) => {
-      if (errorConsulta) {
-        console.error(errorConsulta);
+    [participanteId],
+    (errorParticipante, participante) => {
+      if (errorParticipante) {
+        console.error(errorParticipante);
 
         return res.status(500).json({
-          error: "No se pudo verificar la evaluación.",
+          error: "No se pudo verificar la categoría.",
         });
       }
 
-      if (evaluacionExistente) {
-        return res.status(409).json({
-          error:
-            "Este competidor ya fue evaluado por este jurado.",
+      if (!participante) {
+        return res.status(404).json({
+          error: "El participante no existe.",
         });
       }
+
+      if (Number(participante.cerrada) === 1) {
+        return res.status(403).json({
+          error:
+            "La categoría está cerrada. No se pueden modificar evaluaciones.",
+        });
+      }
+
+      const total =
+        Number(danza) +
+        Number(creatividad) +
+        Number(espacio) +
+        Number(mensaje) +
+        Number(interpretacion) -
+        descuentoNumero;
 
       db.run(
         `
@@ -198,30 +214,42 @@ app.post("/puntajes", (req, res) => {
           total
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+        ON CONFLICT(participante_id, jurado_id)
+        DO UPDATE SET
+          danza = excluded.danza,
+          creatividad = excluded.creatividad,
+          espacio = excluded.espacio,
+          mensaje = excluded.mensaje,
+          interpretacion = excluded.interpretacion,
+          descuento = excluded.descuento,
+          total = excluded.total
         `,
         [
           participanteId,
           juradoId,
-          valores[0],
-          valores[1],
-          valores[2],
-          valores[3],
-          valores[4],
-          descuentoFinal,
+          Number(danza),
+          Number(creatividad),
+          Number(espacio),
+          Number(mensaje),
+          Number(interpretacion),
+          descuentoNumero,
           total,
         ],
-        function (err) {
-          if (err) {
-            console.error(err);
+        function guardarEvaluacion(errorGuardado) {
+          if (errorGuardado) {
+            console.error(errorGuardado);
 
             return res.status(500).json({
               error: "No se pudo guardar la evaluación.",
             });
           }
 
-          res.status(201).json({
-            mensaje: "Evaluación guardada correctamente.",
-            id: this.lastID,
+          return res.json({
+            mensaje:
+              "Evaluación guardada o actualizada correctamente.",
+            participante_id: participanteId,
+            jurado_id: juradoId,
             total,
           });
         }
@@ -700,6 +728,145 @@ res.json(row);
 );
 
 });
+app.get(
+  "/puntajes/:participanteId/:juradoId",
+  (req, res) => {
+    const participanteId = Number(
+      req.params.participanteId
+    );
+
+    const juradoId = Number(req.params.juradoId);
+
+    if (
+      !Number.isInteger(participanteId) ||
+      !Number.isInteger(juradoId)
+    ) {
+      return res.status(400).json({
+        error: "Participante o jurado inválido.",
+      });
+    }
+
+    db.get(
+      `
+      SELECT
+        pu.*,
+        c.cerrada AS categoria_cerrada
+      FROM participantes p
+      JOIN categorias c
+        ON c.id = p.categoria_id
+      LEFT JOIN puntajes pu
+        ON pu.participante_id = p.id
+        AND pu.jurado_id = ?
+      WHERE p.id = ?
+      `,
+      [juradoId, participanteId],
+      (err, evaluacion) => {
+        if (err) {
+          console.error(err);
+
+          return res.status(500).json({
+            error: "No se pudo cargar la evaluación.",
+          });
+        }
+
+        return res.json(
+          evaluacion || {
+            participante_id: participanteId,
+            jurado_id: juradoId,
+            categoria_cerrada: 0,
+          }
+        );
+      }
+    );
+  }
+);
+app.put(
+  "/admin/categorias/:categoriaId/cerrar",
+  (req, res) => {
+    const categoriaId = Number(
+      req.params.categoriaId
+    );
+
+    if (!Number.isInteger(categoriaId)) {
+      return res.status(400).json({
+        error: "Categoría inválida.",
+      });
+    }
+
+    db.run(
+      `
+      UPDATE categorias
+      SET cerrada = 1
+      WHERE id = ?
+      `,
+      [categoriaId],
+      function cerrarCategoria(err) {
+        if (err) {
+          console.error(err);
+
+          return res.status(500).json({
+            error: "No se pudo cerrar la categoría.",
+          });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({
+            error: "La categoría no existe.",
+          });
+        }
+
+        return res.json({
+          mensaje:
+            "Categoría cerrada. Las evaluaciones quedaron bloqueadas.",
+        });
+      }
+    );
+  }
+);
+
+app.put(
+  "/admin/categorias/:categoriaId/reabrir",
+  (req, res) => {
+    const categoriaId = Number(
+      req.params.categoriaId
+    );
+
+    if (!Number.isInteger(categoriaId)) {
+      return res.status(400).json({
+        error: "Categoría inválida.",
+      });
+    }
+
+    db.run(
+      `
+      UPDATE categorias
+      SET cerrada = 0
+      WHERE id = ?
+      `,
+      [categoriaId],
+      function reabrirCategoria(err) {
+        if (err) {
+          console.error(err);
+
+          return res.status(500).json({
+            error: "No se pudo reabrir la categoría.",
+          });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({
+            error: "La categoría no existe.",
+          });
+        }
+
+        return res.json({
+          mensaje:
+            "Categoría reabierta. Los jurados pueden volver a editar.",
+        });
+      }
+    );
+  }
+);
 app.listen(PORT, () => {
   console.log(`✅ Servidor iniciado en el puerto ${PORT}`);
 });
