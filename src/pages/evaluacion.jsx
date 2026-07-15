@@ -91,19 +91,19 @@ export default function Evaluacion() {
         const evaluacionExistente = await respuesta.json();
 
         if (evaluacionExistente?.id) {
-
   setPuntajes({
-    danza: evaluacionExistente.danza,
-    creatividad: evaluacionExistente.creatividad,
-    espacio: evaluacionExistente.espacio,
-    mensaje: evaluacionExistente.mensaje,
-    interpretacion: evaluacionExistente.interpretacion,
-    descuento: evaluacionExistente.descuento,
+    danza: Number(evaluacionExistente.danza),
+    creatividad: Number(evaluacionExistente.creatividad),
+    espacio: Number(evaluacionExistente.espacio),
+    mensaje: Number(evaluacionExistente.mensaje),
+    interpretacion: Number(evaluacionExistente.interpretacion),
+    descuento: Number(evaluacionExistente.descuento || 0),
   });
+}
 
-  if (evaluacionExistente.categoria_cerrada == 1) {
-    setBloqueada(true);
-  }
+if (Number(evaluacionExistente?.categoria_cerrada) === 1) {
+  setBloqueada(true);
+}
 
 }
       } catch (error) {
