@@ -7,17 +7,15 @@ export default function PantallaLED() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function cargarCompetidor() {
+    async function cargarResultado() {
       try {
         const respuesta = await fetch(
           `${API_URL}/ultimo-publicado?t=${Date.now()}`,
-          {
-            cache: "no-store",
-          }
+          { cache: "no-store" }
         );
 
         if (!respuesta.ok) {
-          throw new Error("No se pudo cargar el competidor publicado.");
+          throw new Error("No se pudo cargar el competidor.");
         }
 
         const datos = await respuesta.json();
@@ -30,17 +28,15 @@ export default function PantallaLED() {
       }
     }
 
-    cargarCompetidor();
+    cargarResultado();
 
-    const intervalo = setInterval(cargarCompetidor, 1000);
+    const intervalo = setInterval(cargarResultado, 1000);
 
     return () => clearInterval(intervalo);
   }, []);
 
   const totalParcial = useMemo(() => {
-    if (!resultado) {
-      return 0;
-    }
+    if (!resultado) return 0;
 
     return (
       Number(resultado.jurado_1 || 0) +
@@ -50,103 +46,109 @@ export default function PantallaLED() {
   }, [resultado]);
 
   if (error) {
-    return (
-      <PantallaEspera texto={`Error: ${error}`} />
-    );
+    return <PantallaEspera texto={`Error: ${error}`} />;
   }
 
   if (!resultado) {
-    return (
-      <PantallaEspera texto="Esperando competidor..." />
-    );
+    return <PantallaEspera texto="Esperando competidor..." />;
   }
 
   const jurados = [
     {
       nombre: "JURADO 1",
       valor: resultado.jurado_1,
-      color: "#1587ff",
+      color: "#0787ff",
+      fondo: "#05234b",
     },
     {
       nombre: "JURADO 2",
       valor: resultado.jurado_2,
-      color: "#55a91e",
+      color: "#55d719",
+      fondo: "#174d08",
     },
     {
       nombre: "JURADO 3",
       valor: resultado.jurado_3,
-      color: "#e6b500",
+      color: "#ffd000",
+      fondo: "#6b5200",
     },
     {
       nombre: "JURADO 4",
       reservado: true,
-      color: "#8b28c7",
+      color: "#a629e8",
+      fondo: "#45105f",
     },
     {
       nombre: "JURADO 5",
       reservado: true,
-      color: "#d71920",
+      color: "#ff2027",
+      fondo: "#681014",
     },
   ];
 
   return (
-    <main className="pantalla-led">
+    <main className="pantalla">
       <section className="lienzo">
-        <div className="contenido-dinamico">
-          <div className="categoria">
-            <span>CATEGORÍA</span>
+        {/* Cubre la categoría impresa en la imagen */}
+        <div className="bloque-categoria">
+          <span>CATEGORÍA</span>
 
-            <strong>
-              {resultado.categoria || "CATEGORÍA"}
-            </strong>
-          </div>
-
-          <div className="competidor">
-            <span>COMPETIDOR ACTUAL</span>
-
-            <strong>
-              {resultado.nombre || "COMPETIDOR"}
-            </strong>
-          </div>
-
-          <div className="jurados">
-            {jurados.map((jurado) => (
-              <article
-                key={jurado.nombre}
-                className="tarjeta-jurado"
-                style={{
-                  "--color-jurado": jurado.color,
-                }}
-              >
-                <div className="nombre-jurado">
-                  {jurado.nombre}
-                </div>
-
-                <div className="puntaje-jurado">
-                  {jurado.reservado ? (
-                    <>
-                      <div className="candado">🔒</div>
-
-                      <div className="incognito">
-                        INCÓGNITO
-                      </div>
-                    </>
-                  ) : (
-                    <strong>
-                      {jurado.valor ?? "—"}
-                    </strong>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="total">
-            <span>TOTAL PARCIAL</span>
-
-            <strong>{totalParcial}</strong>
-          </div>
+          <strong>
+            {resultado.categoria || "CATEGORÍA"}
+          </strong>
         </div>
+
+        {/* Cubre el competidor impreso en la imagen */}
+        <div className="bloque-competidor">
+          <span>COMPETIDOR ACTUAL</span>
+
+          <strong>
+            {resultado.nombre || "COMPETIDOR"}
+          </strong>
+        </div>
+
+        {/* Cubre completamente las tarjetas impresas */}
+        <section className="contenedor-jurados">
+          {jurados.map((jurado) => (
+            <article
+              key={jurado.nombre}
+              className="tarjeta"
+              style={{
+                "--color": jurado.color,
+                "--fondo": jurado.fondo,
+              }}
+            >
+              <div className="encabezado-jurado">
+                {jurado.nombre}
+              </div>
+
+              <div className="contenido-jurado">
+                {jurado.reservado ? (
+                  <>
+                    <div className="candado">
+                      🔒
+                    </div>
+
+                    <span className="texto-incognito">
+                      INCÓGNITO
+                    </span>
+                  </>
+                ) : (
+                  <strong className="numero">
+                    {jurado.valor ?? "—"}
+                  </strong>
+                )}
+              </div>
+            </article>
+          ))}
+        </section>
+
+        {/* Cubre el total impreso en la imagen */}
+        <section className="bloque-total">
+          <span>TOTAL PARCIAL</span>
+
+          <strong>{totalParcial}</strong>
+        </section>
       </section>
 
       <style>{`
@@ -164,7 +166,7 @@ export default function PantallaLED() {
           background: #000;
         }
 
-        .pantalla-led {
+        .pantalla {
           width: 100vw;
           height: 100vh;
           display: grid;
@@ -175,249 +177,404 @@ export default function PantallaLED() {
         }
 
         /*
-          La imagen scoreboard.png mide aproximadamente 3:2.
-          El lienzo mantiene esa proporción para que no se corte.
+          La imagen mide 1536 x 1024.
+          Su proporción es 3:2.
         */
         .lienzo {
           position: relative;
+
           width: min(100vw, 150vh);
           height: min(100vh, 66.6667vw);
+
           overflow: hidden;
+
           background-image: url("/scoreboard.png");
           background-size: 100% 100%;
           background-position: center;
           background-repeat: no-repeat;
+
           box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+
+          animation: aparecer 0.5s ease;
         }
 
-        .contenido-dinamico {
-          position: absolute;
-          inset: 0;
-          animation: entrada 0.6s ease;
-        }
-
-        @keyframes entrada {
+        @keyframes aparecer {
           from {
             opacity: 0;
-            transform: scale(0.99);
           }
 
           to {
             opacity: 1;
-            transform: scale(1);
           }
         }
 
-        /*
-          Estas capas oscuras cubren los textos y números
-          que vienen impresos en la imagen de ejemplo.
-        */
-        .categoria {
+        /* =========================
+           CATEGORÍA
+        ========================= */
+
+        .bloque-categoria {
           position: absolute;
-          top: 23.5%;
-          left: 27%;
-          width: 46%;
+
+          top: 28.5%;
+          left: 22.5%;
+
+          width: 55%;
           height: 14%;
+
           display: flex;
           flex-direction: column;
-          align-items: center;
           justify-content: center;
+          align-items: center;
+
           text-align: center;
-          color: white;
-          background: rgba(13, 9, 5, 0.96);
-          border-radius: 10px;
+
+          background:
+            linear-gradient(
+              180deg,
+              rgba(5, 6, 8, 0.99),
+              rgba(10, 10, 11, 0.99)
+            );
+
+          border: 2px solid rgba(214, 160, 28, 0.85);
+          border-radius: 13px;
+
+          box-shadow:
+            0 10px 25px rgba(0, 0, 0, 0.8);
         }
 
-        .categoria span {
-          color: #e2b946;
-          font-size: clamp(16px, 1.8vw, 34px);
+        .bloque-categoria span {
+          color: #eebc3e;
+
+          font-size: clamp(
+            14px,
+            1.8vw,
+            32px
+          );
+
           font-weight: 900;
           line-height: 1;
         }
 
-        .categoria strong {
-          margin-top: 1%;
-          color: #f5ead1;
-          font-size: clamp(34px, 4.7vw, 88px);
+        .bloque-categoria strong {
+          max-width: 96%;
+
+          margin-top: 1.5%;
+
+          color: #f8f1df;
+
+          font-size: clamp(
+            32px,
+            5vw,
+            85px
+          );
+
           line-height: 0.95;
           text-transform: uppercase;
-          text-shadow: 0 4px 10px #000;
-        }
 
-        .competidor {
-          position: absolute;
-          top: 38.5%;
-          left: 23%;
-          width: 54%;
-          height: 9%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          color: white;
-          background:
-            linear-gradient(
-              90deg,
-              rgba(13, 9, 5, 0.98),
-              rgba(25, 14, 8, 0.98),
-              rgba(13, 9, 5, 0.98)
-            );
-          border: 2px solid #b88724;
-          border-radius: 10px;
-        }
-
-        .competidor span {
-          color: #e2b946;
-          font-size: clamp(11px, 1.1vw, 21px);
-          font-weight: 900;
-        }
-
-        .competidor strong {
-          max-width: 96%;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          color: #fff;
-          font-size: clamp(20px, 2.3vw, 43px);
-          line-height: 1;
-          text-transform: uppercase;
+
+          text-shadow:
+            0 5px 8px #000;
         }
 
-        .jurados {
+        /* =========================
+           COMPETIDOR
+        ========================= */
+
+        .bloque-competidor {
           position: absolute;
-          top: 48.2%;
-          left: 4%;
-          width: 92%;
-          height: 27%;
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 1.2%;
-        }
 
-        .tarjeta-jurado {
-          min-width: 0;
-          overflow: hidden;
-          border: 3px solid var(--color-jurado);
-          border-radius: 12px;
-          background: rgba(1, 1, 1, 0.97);
-          box-shadow:
-            0 0 15px color-mix(
-              in srgb,
-              var(--color-jurado) 45%,
-              transparent
-            );
-        }
+          top: 42.2%;
+          left: 20.5%;
 
-        .nombre-jurado {
-          height: 21%;
-          display: grid;
-          place-items: center;
-          color: #f6efd9;
+          width: 59%;
+          height: 8.5%;
+
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+
+          text-align: center;
+
           background:
             linear-gradient(
               180deg,
-              color-mix(
-                in srgb,
-                var(--color-jurado) 65%,
-                #000
-              ),
-              color-mix(
-                in srgb,
-                var(--color-jurado) 35%,
-                #000
-              )
+              rgba(8, 8, 8, 0.99),
+              rgba(15, 13, 8, 0.99)
             );
-          border-bottom: 1px solid var(--color-jurado);
-          font-size: clamp(12px, 1.35vw, 26px);
+
+          border: 2px solid #c8951e;
+          border-radius: 12px;
+
+          box-shadow:
+            0 8px 20px rgba(0, 0, 0, 0.85);
+        }
+
+        .bloque-competidor span {
+          color: #eebc3e;
+
+          font-size: clamp(
+            11px,
+            1.25vw,
+            23px
+          );
+
+          font-weight: 900;
+          line-height: 1;
+        }
+
+        .bloque-competidor strong {
+          width: 96%;
+
+          margin-top: 0.5%;
+
+          color: white;
+
+          font-size: clamp(
+            18px,
+            2.5vw,
+            44px
+          );
+
+          line-height: 1;
+          text-transform: uppercase;
+
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          text-shadow:
+            0 4px 7px #000;
+        }
+
+        /* =========================
+           JURADOS
+        ========================= */
+
+        .contenedor-jurados {
+          position: absolute;
+
+          top: 52%;
+          left: 4.2%;
+
+          width: 91.6%;
+          height: 26.5%;
+
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+
+          gap: 1.25%;
+        }
+
+        .tarjeta {
+          min-width: 0;
+          height: 100%;
+
+          overflow: hidden;
+
+          background:
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.99),
+              rgba(3, 3, 3, 0.99)
+            );
+
+          border: 3px solid var(--color);
+          border-radius: 14px;
+
+          box-shadow:
+            0 0 14px var(--color),
+            0 12px 25px rgba(0, 0, 0, 0.85);
+        }
+
+        .encabezado-jurado {
+          height: 20%;
+
+          display: grid;
+          place-items: center;
+
+          color: white;
+
+          background:
+            linear-gradient(
+              180deg,
+              var(--fondo),
+              rgba(0, 0, 0, 0.45)
+            );
+
+          border-bottom:
+            1px solid var(--color);
+
+          font-size: clamp(
+            11px,
+            1.45vw,
+            27px
+          );
+
           font-weight: 900;
           text-align: center;
         }
 
-        .puntaje-jurado {
-          height: 79%;
+        .contenido-jurado {
+          height: 80%;
+
           display: flex;
           flex-direction: column;
-          align-items: center;
           justify-content: center;
-        }
-
-        .puntaje-jurado strong {
-          color: #f8efd9;
-          font-size: clamp(54px, 7.4vw, 138px);
-          line-height: 1;
-          text-shadow:
-            0 4px 4px #000,
-            0 0 20px rgba(255, 210, 110, 0.25);
-        }
-
-        .candado {
-          font-size: clamp(42px, 5vw, 94px);
-          line-height: 1;
-          filter: grayscale(1);
-        }
-
-        .incognito {
-          margin-top: 4%;
-          color: #c8c8c8;
-          font-size: clamp(11px, 1.25vw, 24px);
-          font-weight: 900;
-        }
-
-        .total {
-          position: absolute;
-          top: 76%;
-          left: 27%;
-          width: 46%;
-          height: 16%;
-          display: flex;
-          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          color: white;
+
           background:
             linear-gradient(
               180deg,
-              rgba(8, 6, 3, 0.98),
-              rgba(20, 13, 5, 0.98)
+              rgba(2, 2, 2, 0.99),
+              rgba(0, 0, 0, 0.99)
             );
-          border: 3px solid #b88724;
-          border-radius: 12px;
-          box-shadow:
-            0 0 25px rgba(255, 174, 0, 0.35);
         }
 
-        .total span {
-          color: #e3b94a;
-          font-size: clamp(18px, 2.2vw, 42px);
+        .numero {
+          color: #f8efdb;
+
+          font-size: clamp(
+            55px,
+            7.3vw,
+            132px
+          );
+
+          line-height: 1;
+
+          text-shadow:
+            0 6px 6px #000,
+            0 0 18px rgba(255, 213, 120, 0.35);
+        }
+
+        .candado {
+          font-size: clamp(
+            43px,
+            5vw,
+            90px
+          );
+
+          line-height: 1;
+
+          filter:
+            grayscale(1)
+            brightness(1.45);
+        }
+
+        .texto-incognito {
+          margin-top: 6%;
+
+          color: #e2e2e2;
+
+          font-size: clamp(
+            10px,
+            1.25vw,
+            22px
+          );
+
+          font-weight: 900;
+        }
+
+        /* =========================
+           TOTAL
+        ========================= */
+
+        .bloque-total {
+          position: absolute;
+
+          top: 81%;
+          left: 26.5%;
+
+          width: 47%;
+          height: 15%;
+
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+
+          text-align: center;
+
+          background:
+            linear-gradient(
+              180deg,
+              rgba(5, 5, 5, 0.99),
+              rgba(13, 10, 5, 0.99)
+            );
+
+          border: 3px solid #c8951e;
+          border-radius: 14px;
+
+          box-shadow:
+            0 0 25px rgba(230, 171, 30, 0.4),
+            0 15px 30px rgba(0, 0, 0, 0.85);
+        }
+
+        .bloque-total span {
+          color: #eebc3e;
+
+          font-size: clamp(
+            16px,
+            2vw,
+            37px
+          );
+
           font-weight: 900;
           line-height: 1;
         }
 
-        .total strong {
-          color: #f6ead0;
-          font-size: clamp(65px, 8vw, 150px);
+        .bloque-total strong {
+          color: #f8efdb;
+
+          font-size: clamp(
+            58px,
+            7.7vw,
+            138px
+          );
+
           line-height: 0.9;
+
           text-shadow:
-            0 4px 5px #000,
-            0 0 18px rgba(255, 199, 80, 0.3);
+            0 6px 7px #000,
+            0 0 20px rgba(255, 201, 90, 0.3);
         }
 
+        /* Pantallas más cuadradas */
+
         @media (max-aspect-ratio: 4 / 3) {
-          .categoria strong {
-            font-size: clamp(27px, 5vw, 60px);
+          .bloque-categoria strong {
+            font-size: clamp(
+              27px,
+              5vw,
+              60px
+            );
           }
 
-          .competidor strong {
-            font-size: clamp(17px, 2.8vw, 34px);
+          .bloque-competidor strong {
+            font-size: clamp(
+              17px,
+              2.8vw,
+              34px
+            );
           }
 
-          .nombre-jurado {
-            font-size: clamp(9px, 1.5vw, 18px);
+          .encabezado-jurado {
+            font-size: clamp(
+              9px,
+              1.5vw,
+              18px
+            );
           }
 
-          .incognito {
-            font-size: clamp(9px, 1.3vw, 16px);
+          .texto-incognito {
+            font-size: clamp(
+              9px,
+              1.3vw,
+              16px
+            );
           }
         }
       `}</style>
@@ -431,13 +588,21 @@ function PantallaEspera({ texto }) {
       style={{
         width: "100vw",
         height: "100vh",
+
         display: "grid",
         placeItems: "center",
+
         color: "#e4b04d",
+
         background:
           "radial-gradient(circle at center, #231608, #000 70%)",
-        fontFamily: "Arial, Helvetica, sans-serif",
-        fontSize: "clamp(30px, 5vw, 75px)",
+
+        fontFamily:
+          "Arial, Helvetica, sans-serif",
+
+        fontSize:
+          "clamp(30px, 5vw, 75px)",
+
         fontWeight: "bold",
         textAlign: "center",
       }}
