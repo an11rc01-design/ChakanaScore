@@ -54,6 +54,12 @@ db.serialize(() => {
             total INTEGER
         )
     `);
+    db.run(`
+CREATE TABLE IF NOT EXISTS pantalla_publica(
+    id INTEGER PRIMARY KEY,
+    participante_id INTEGER
+)
+`);
 
 });
 
@@ -203,4 +209,18 @@ db.get("SELECT COUNT(*) AS total FROM jurados", (err, row) => {
         console.log("✅ Jurados creados.");
     }
 });
+db.get(
+    "SELECT COUNT(*) AS total FROM pantalla_publica",
+    (err,row)=>{
+
+        if(row.total===0){
+
+            db.run(
+                "INSERT INTO pantalla_publica(id,participante_id) VALUES(1,NULL)"
+            );
+
+        }
+
+    }
+);
 module.exports = db;

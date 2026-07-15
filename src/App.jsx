@@ -4,18 +4,20 @@ import Login from "./pages/login";
 import Panel from "./pages/panel";
 import Competencia from "./pages/competencia";
 import Evaluacion from "./pages/evaluacion";
-import Publico from "./pages/publico";
+import Publico from "./pages/PublicoTV";
 import Administrador from "./pages/Administrador";
 import GestionParticipantes from "./pages/GestionParticipantes";
 import ResultadosAdmin from "./pages/ResultadosAdmin";
 import ConfiguracionTorneo from "./pages/ConfiguracionTorneo";
 import ReiniciarTorneo from "./pages/ReiniciarTorneo";
+import PantallaLED from "./pages/PantallaLED";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/pantalla" element={<PantallaLED />} />
         <Route
   path="/administrador/configuracion"
   element={<ConfiguracionTorneo />}

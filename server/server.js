@@ -623,6 +623,83 @@ app.post("/admin/reiniciar-puntajes", (req, res) => {
     });
   });
 });
+app.post("/publicar", (req, res) => {
+
+    const { participante_id } = req.body;
+
+    db.run(
+        `
+        UPDATE pantalla_publica
+        SET participante_id=?
+        WHERE id=1
+        `,
+        [participante_id],
+        function(err){
+
+            if(err){
+
+                return res.status(500).json(err);
+
+            }
+
+            res.json({
+                ok:true
+            });
+
+        }
+    );
+
+});
+app.get("/ultimo-publicado", (req,res)=>{
+
+    db.get(
+
+`
+SELECT
+
+p.id,
+p.codigo,
+p.nombre,
+
+c.nombre AS categoria,
+
+MAX(CASE WHEN pu.jurado_id=1 THEN pu.total END) jurado_1,
+MAX(CASE WHEN pu.jurado_id=2 THEN pu.total END) jurado_2,
+MAX(CASE WHEN pu.jurado_id=3 THEN pu.total END) jurado_3
+
+FROM pantalla_publica pp
+
+JOIN participantes p
+ON p.id=pp.participante_id
+
+JOIN categorias c
+ON c.id=p.categoria_id
+
+LEFT JOIN puntajes pu
+ON pu.participante_id=p.id
+
+WHERE pp.id=1
+
+GROUP BY
+p.id
+
+`,
+
+(err,row)=>{
+
+if(err){
+
+return res.status(500).json(err);
+
+}
+
+res.json(row);
+
+}
+
+);
+
+});
 app.listen(PORT, () => {
   console.log(`✅ Servidor iniciado en el puerto ${PORT}`);
 });

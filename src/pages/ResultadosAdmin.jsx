@@ -4,26 +4,20 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import NavbarAdmin from "../components/NavbarAdmin";
-import logoWiracocha from "../assets/logo-wiracocha.jpeg";
 
 const API_URL = "https://chakanascore.onrender.com";
-async function convertirImagenADataURL(rutaImagen) {
-  const respuesta = await fetch(rutaImagen);
+const LOGO_URL = "/logo-wiracocha.jpeg";
 
-  if (!respuesta.ok) {
-    throw new Error("No se pudo cargar el logo.");
-  }
+async function imagenADataURL(url) {
+  const respuesta = await fetch(url, { cache: "no-store" });
+  if (!respuesta.ok) throw new Error("No se pudo cargar el logo.");
 
   const blob = await respuesta.blob();
 
   return new Promise((resolve, reject) => {
     const lector = new FileReader();
-
     lector.onloadend = () => resolve(lector.result);
-    lector.onerror = () => reject(
-      new Error("No se pudo convertir el logo.")
-    );
-
+    lector.onerror = reject;
     lector.readAsDataURL(blob);
   });
 }
@@ -37,24 +31,24 @@ export default function ResultadosAdmin() {
   const [torneo, setTorneo] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
+  const [publicandoId, setPublicandoId] = useState(null);
+  const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function cargarDatosIniciales() {
+    async function cargarInicial() {
       try {
-        const [respuestaCategorias, respuestaTorneo] = await Promise.all([
+        const [rCategorias, rTorneo] = await Promise.all([
           fetch(`${API_URL}/categorias`),
           fetch(`${API_URL}/torneo`),
         ]);
 
-        if (!respuestaCategorias.ok) {
+        if (!rCategorias.ok) {
           throw new Error("No se pudieron cargar las categorías.");
         }
 
-        const datosCategorias = await respuestaCategorias.json();
-        const datosTorneo = respuestaTorneo.ok
-          ? await respuestaTorneo.json()
-          : null;
+        const datosCategorias = await rCategorias.json();
+        const datosTorneo = rTorneo.ok ? await rTorneo.json() : null;
 
         setCategorias(datosCategorias);
         setTorneo(datosTorneo);
@@ -62,20 +56,18 @@ export default function ResultadosAdmin() {
         if (datosCategorias.length > 0) {
           setCategoriaId(String(datosCategorias[0].id));
         }
-      } catch (errorCarga) {
-        console.error(errorCarga);
-        setError(errorCarga.message);
+      } catch (e) {
+        console.error(e);
+        setError(e.message);
         setCargando(false);
       }
     }
 
-    cargarDatosIniciales();
+    cargarInicial();
   }, []);
 
   useEffect(() => {
-    if (!categoriaId) {
-      return undefined;
-    }
+    if (!categoriaId) return undefined;
 
     async function cargarResultados() {
       try {
@@ -87,12 +79,11 @@ export default function ResultadosAdmin() {
           throw new Error("No se pudieron cargar los resultados.");
         }
 
-        const datos = await respuesta.json();
-        setResultados(datos);
+        setResultados(await respuesta.json());
         setError("");
-      } catch (errorCarga) {
-        console.error(errorCarga);
-        setError(errorCarga.message);
+      } catch (e) {
+        console.error(e);
+        setError(e.message);
       } finally {
         setCargando(false);
       }
@@ -102,7 +93,6 @@ export default function ResultadosAdmin() {
     cargarResultados();
 
     const intervalo = setInterval(cargarResultados, 3000);
-
     return () => clearInterval(intervalo);
   }, [categoriaId]);
 
@@ -119,7 +109,10 @@ export default function ResultadosAdmin() {
   const lugarTorneo = torneo?.lugar || "";
   const fechaTorneo = torneo?.fecha || "";
 
-  function limpiarNombreArchivo(texto) {
+  const completo = (r) => Number(r.jurados_evaluados) === 5;
+  const lugar = (r, i) => (completo(r) ? i + 1 : "");
+
+  function nombreArchivo(texto) {
     return String(texto || "archivo")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -127,123 +120,54 @@ export default function ResultadosAdmin() {
       .replace(/^_+|_+$/g, "");
   }
 
-  function resultadoCompleto(resultado) {
-    return Number(resultado.jurados_evaluados) === 5;
-  }
-
-  function obtenerLugar(resultado, indice) {
-    return resultadoCompleto(resultado) ? indice + 1 : "";
-  }
-
-  function crearFilasExcel(lista) {
-    return lista.map((resultado, indice) => ({
-      Lugar: obtenerLugar(resultado, indice),
-      Código: resultado.codigo || "",
-      Competidor: resultado.participante,
-      "Jurado 1": resultado.jurado_1 ?? "",
-      "Jurado 2": resultado.jurado_2 ?? "",
-      "Jurado 3": resultado.jurado_3 ?? "",
-      "Jurado 4": resultado.jurado_4 ?? "",
-      "Jurado 5 - Incógnito": resultado.jurado_5 ?? "",
-      "Jurados evaluados": `${resultado.jurados_evaluados}/5`,
-      "Puntaje total": resultadoCompleto(resultado)
-        ? resultado.total_general
-        : "Pendiente",
+  function filasExcel(lista) {
+    return lista.map((r, i) => ({
+      Lugar: lugar(r, i),
+      Código: r.codigo || "",
+      Competidor: r.participante,
+      "Jurado 1": r.jurado_1 ?? "",
+      "Jurado 2": r.jurado_2 ?? "",
+      "Jurado 3": r.jurado_3 ?? "",
+      "Jurado 4": r.jurado_4 ?? "",
+      "Jurado 5 - Incógnito": r.jurado_5 ?? "",
+      Evaluados: `${r.jurados_evaluados}/5`,
+      Total: completo(r) ? r.total_general : "Pendiente",
     }));
   }
 
-  async function obtenerTodasLasCategorias() {
-    const respuestas = await Promise.all(
+  async function cargarTodasLasCategorias() {
+    return Promise.all(
       categorias.map(async (categoria) => {
         const respuesta = await fetch(
           `${API_URL}/detalle-resultados/${categoria.id}`
         );
 
         if (!respuesta.ok) {
-          throw new Error(
-            `No se pudieron cargar los resultados de ${categoria.nombre}.`
-          );
+          throw new Error(`No se pudo cargar ${categoria.nombre}.`);
         }
-
-        const datos = await respuesta.json();
 
         return {
           categoria,
-          resultados: datos,
+          resultados: await respuesta.json(),
         };
       })
     );
-
-    return respuestas;
-  }
-
-  function agregarResumenExcel(libro, datosCategorias) {
-    const filasResumen = datosCategorias.map(({ categoria, resultados }) => {
-      const completos = resultados.filter(resultadoCompleto).length;
-      const total = resultados.length;
-      const evaluaciones = resultados.reduce(
-        (suma, resultado) =>
-          suma + Number(resultado.jurados_evaluados || 0),
-        0
-      );
-
-      return {
-        Categoría: categoria.nombre,
-        Competidores: total,
-        "Competidores completos": completos,
-        "Evaluaciones realizadas": evaluaciones,
-        "Evaluaciones requeridas": total * 5,
-        Estado:
-          total > 0 && completos === total
-            ? "Categoría completa"
-            : "Evaluaciones pendientes",
-      };
-    });
-
-    const hojaResumen = XLSX.utils.json_to_sheet(filasResumen, {
-      origin: "A6",
-    });
-
-    XLSX.utils.sheet_add_aoa(
-      hojaResumen,
-      [
-        [nombreTorneo],
-        ["RESULTADOS GENERALES DE LA COMPETENCIA"],
-        [`Lugar: ${lugarTorneo || "No informado"}`],
-        [`Fecha: ${fechaTorneo || "No informada"}`],
-        [],
-      ],
-      { origin: "A1" }
-    );
-
-    hojaResumen["!cols"] = [
-      { wch: 28 },
-      { wch: 16 },
-      { wch: 24 },
-      { wch: 24 },
-      { wch: 24 },
-      { wch: 24 },
-    ];
-
-    XLSX.utils.book_append_sheet(libro, hojaResumen, "Resumen");
   }
 
   function exportarExcelCategoria() {
-    if (resultados.length === 0) {
-      alert("No existen resultados para exportar.");
-      return;
-    }
+    if (!resultados.length) return alert("No existen resultados.");
 
     const libro = XLSX.utils.book_new();
-    const hoja = XLSX.utils.json_to_sheet(crearFilasExcel(resultados), {
-      origin: "A6",
+    const hoja = XLSX.utils.json_to_sheet(filasExcel(resultados), {
+      origin: "A7",
     });
 
     XLSX.utils.sheet_add_aoa(
       hoja,
       [
+        ["PRODUCCIONES WIRACOCHA"],
         [nombreTorneo],
-        ["RESULTADOS DE CATEGORÍA"],
+        ["RESULTADOS OFICIALES"],
         [`Categoría: ${nombreCategoria}`],
         [`Lugar: ${lugarTorneo || "No informado"}`],
         [`Fecha: ${fechaTorneo || "No informada"}`],
@@ -252,16 +176,8 @@ export default function ResultadosAdmin() {
     );
 
     hoja["!cols"] = [
-      { wch: 9 },
-      { wch: 12 },
-      { wch: 34 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 20 },
-      { wch: 18 },
-      { wch: 16 },
+      { wch: 9 }, { wch: 12 }, { wch: 34 }, { wch: 12 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
     ];
 
     XLSX.utils.book_append_sheet(
@@ -272,32 +188,56 @@ export default function ResultadosAdmin() {
 
     XLSX.writeFile(
       libro,
-      `Resultados_${limpiarNombreArchivo(nombreCategoria)}.xlsx`
+      `Resultados_${nombreArchivo(nombreCategoria)}.xlsx`
     );
   }
 
   async function exportarExcelCompleto() {
-    if (categorias.length === 0) {
-      alert("No existen categorías para exportar.");
-      return;
-    }
+    if (!categorias.length) return alert("No existen categorías.");
 
     setExportando(true);
 
     try {
-      const datosCategorias = await obtenerTodasLasCategorias();
+      const datos = await cargarTodasLasCategorias();
       const libro = XLSX.utils.book_new();
 
-      agregarResumenExcel(libro, datosCategorias);
+      const resumen = datos.map(({ categoria, resultados: lista }) => ({
+        Categoría: categoria.nombre,
+        Competidores: lista.length,
+        Completos: lista.filter(completo).length,
+        Estado:
+          lista.length > 0 && lista.every(completo)
+            ? "Completa"
+            : "Pendiente",
+      }));
 
-      datosCategorias.forEach(({ categoria, resultados: lista }) => {
-        const hoja = XLSX.utils.json_to_sheet(crearFilasExcel(lista), {
-          origin: "A6",
+      const hojaResumen = XLSX.utils.json_to_sheet(resumen, {
+        origin: "A6",
+      });
+
+      XLSX.utils.sheet_add_aoa(
+        hojaResumen,
+        [
+          ["PRODUCCIONES WIRACOCHA"],
+          [nombreTorneo],
+          ["RESULTADOS GENERALES"],
+          [`Lugar: ${lugarTorneo || "No informado"}`],
+          [`Fecha: ${fechaTorneo || "No informada"}`],
+        ],
+        { origin: "A1" }
+      );
+
+      XLSX.utils.book_append_sheet(libro, hojaResumen, "Resumen");
+
+      datos.forEach(({ categoria, resultados: lista }) => {
+        const hoja = XLSX.utils.json_to_sheet(filasExcel(lista), {
+          origin: "A7",
         });
 
         XLSX.utils.sheet_add_aoa(
           hoja,
           [
+            ["PRODUCCIONES WIRACOCHA"],
             [nombreTorneo],
             ["RESULTADOS OFICIALES"],
             [`Categoría: ${categoria.nombre}`],
@@ -306,19 +246,6 @@ export default function ResultadosAdmin() {
           ],
           { origin: "A1" }
         );
-
-        hoja["!cols"] = [
-          { wch: 9 },
-          { wch: 12 },
-          { wch: 34 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 12 },
-          { wch: 20 },
-          { wch: 18 },
-          { wch: 16 },
-        ];
 
         XLSX.utils.book_append_sheet(
           libro,
@@ -329,131 +256,84 @@ export default function ResultadosAdmin() {
 
       XLSX.writeFile(
         libro,
-        `Resultados_Completos_${limpiarNombreArchivo(nombreTorneo)}.xlsx`
+        `Resultados_Completos_${nombreArchivo(nombreTorneo)}.xlsx`
       );
-    } catch (errorExportacion) {
-      console.error(errorExportacion);
-      alert(errorExportacion.message);
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
     } finally {
       setExportando(false);
     }
   }
 
-  async function agregarCabeceraPDF(documento, subtitulo) {
-  try {
-    const logoBase64 = await convertirImagenADataURL(
-      logoWiracocha
-    );
+  async function cabeceraPDF(documento, subtitulo) {
+    try {
+      const logo = await imagenADataURL(LOGO_URL);
+      documento.addImage(logo, "JPEG", 12, 6, 30, 30);
+      documento.addImage(logo, "JPEG", 255, 6, 30, 30);
+    } catch (e) {
+      console.warn("PDF sin logo:", e);
+    }
 
-    documento.addImage(
-      logoBase64,
-      "JPEG",
-      12,
-      7,
-      30,
-      30
-    );
-
-    documento.addImage(
-      logoBase64,
-      "JPEG",
-      255,
-      7,
-      30,
-      30
-    );
-  } catch (errorLogo) {
-    console.error("Error cargando logo en PDF:", errorLogo);
-  }
-
-  documento.setFont("helvetica", "bold");
-  documento.setFontSize(19);
-
-  documento.text(
-    "PRODUCCIONES WIRACOCHA",
-    148,
-    13,
-    { align: "center" }
-  );
-
-  documento.setFontSize(17);
-
-  documento.text(
-    nombreTorneo.toUpperCase(),
-    148,
-    21,
-    { align: "center" }
-  );
-
-  documento.setFontSize(13);
-
-  documento.text(
-    subtitulo.toUpperCase(),
-    148,
-    29,
-    { align: "center" }
-  );
-
-  documento.setFont("helvetica", "normal");
-  documento.setFontSize(10);
-
-  const informacion = [
-    lugarTorneo ? `Lugar: ${lugarTorneo}` : "",
-    fechaTorneo ? `Fecha: ${fechaTorneo}` : "",
-  ]
-    .filter(Boolean)
-    .join("    |    ");
-
-  if (informacion) {
-    documento.text(informacion, 148, 36, {
+    documento.setFont("helvetica", "bold");
+    documento.setFontSize(18);
+    documento.text("PRODUCCIONES WIRACOCHA", 148, 13, {
       align: "center",
     });
+
+    documento.setFontSize(16);
+    documento.text(nombreTorneo.toUpperCase(), 148, 21, {
+      align: "center",
+    });
+
+    documento.setFontSize(12);
+    documento.text(subtitulo.toUpperCase(), 148, 29, {
+      align: "center",
+    });
+
+    documento.setFont("helvetica", "normal");
+    documento.setFontSize(9);
+
+    const info = [
+      lugarTorneo ? `Lugar: ${lugarTorneo}` : "",
+      fechaTorneo ? `Fecha: ${fechaTorneo}` : "",
+    ]
+      .filter(Boolean)
+      .join("   |   ");
+
+    if (info) documento.text(info, 148, 36, { align: "center" });
+
+    documento.setDrawColor(184, 126, 45);
+    documento.line(12, 40, 285, 40);
   }
 
-  documento.setDrawColor(184, 126, 45);
-  documento.line(12, 40, 285, 40);
-}
-
-  
-  function crearFilasPDF(lista) {
-    return lista.map((resultado, indice) => [
-      obtenerLugar(resultado, indice) || "—",
-      resultado.codigo || "—",
-      resultado.participante,
-      resultado.jurado_1 ?? "—",
-      resultado.jurado_2 ?? "—",
-      resultado.jurado_3 ?? "—",
-      resultado.jurado_4 ?? "—",
-      resultado.jurado_5 ?? "—",
-      `${resultado.jurados_evaluados}/5`,
-      resultadoCompleto(resultado)
-        ? resultado.total_general
-        : "Pendiente",
+  function filasPDF(lista) {
+    return lista.map((r, i) => [
+      lugar(r, i) || "—",
+      r.codigo || "—",
+      r.participante,
+      r.jurado_1 ?? "—",
+      r.jurado_2 ?? "—",
+      r.jurado_3 ?? "—",
+      r.jurado_4 ?? "—",
+      r.jurado_5 ?? "—",
+      `${r.jurados_evaluados}/5`,
+      completo(r) ? r.total_general : "Pendiente",
     ]);
   }
 
-  function agregarTablaPDF(documento, lista, startY = 38) {
+  function tablaPDF(documento, lista) {
     autoTable(documento, {
-      startY,
-      head: [
-        [
-          "Lugar",
-          "Código",
-          "Competidor",
-          "J1",
-          "J2",
-          "J3",
-          "J4",
-          "J5",
-          "Evaluados",
-          "Total",
-        ],
-      ],
-      body: crearFilasPDF(lista),
+      startY: 45,
+      head: [[
+        "Lugar", "Código", "Competidor", "J1", "J2",
+        "J3", "J4", "J5", "Evaluados", "Total",
+      ]],
+      body: filasPDF(lista),
       theme: "grid",
       styles: {
         fontSize: 8,
-        cellPadding: 2.5,
+        cellPadding: 2.6,
         halign: "center",
         valign: "middle",
       },
@@ -462,218 +342,169 @@ export default function ResultadosAdmin() {
         textColor: [245, 197, 66],
         fontStyle: "bold",
       },
+      alternateRowStyles: {
+        fillColor: [247, 242, 231],
+      },
       columnStyles: {
-        2: {
-          halign: "left",
-          cellWidth: 58,
-        },
+        2: { halign: "left", cellWidth: 58 },
       },
     });
   }
 
-  function agregarFirmasPDF(documento) {
+  function firmasPDF(documento) {
     const finalY = documento.lastAutoTable?.finalY || 150;
-    const paginaAlto = documento.internal.pageSize.getHeight();
-    const posicionFirma = Math.min(finalY + 25, paginaAlto - 20);
+    const alto = documento.internal.pageSize.getHeight();
+    const y = Math.min(finalY + 25, alto - 20);
+
+    documento.line(25, y, 90, y);
+    documento.line(205, y, 270, y);
 
     documento.setFontSize(9);
-    documento.setFont("helvetica", "normal");
-
-    documento.line(25, posicionFirma, 90, posicionFirma);
-    documento.text("Firma organización", 57, posicionFirma + 5, {
+    documento.text("Firma organización", 57, y + 5, {
       align: "center",
     });
-
-    documento.line(205, posicionFirma, 270, posicionFirma);
-    documento.text("Firma jurado responsable", 237, posicionFirma + 5, {
+    documento.text("Firma jurado responsable", 237, y + 5, {
       align: "center",
     });
   }
 
   async function exportarPDFCategoria() {
-    if (resultados.length === 0) {
-      alert("No existen resultados para exportar.");
-      return;
-    }
-
-    const documento = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
-
-    await agregarCabeceraPDF(
-  documento,
-  `Resultados oficiales - ${nombreCategoria}`
-);
-    agregarTablaPDF(documento, resultados);
-    agregarFirmasPDF(documento);
-
-    documento.save(
-      `Resultados_${limpiarNombreArchivo(nombreCategoria)}.pdf`
-    );
-  }
-
-  async function exportarPDFCompleto() {
-    if (categorias.length === 0) {
-      alert("No existen categorías para exportar.");
-      return;
-    }
+    if (!resultados.length) return alert("No existen resultados.");
 
     setExportando(true);
 
     try {
-      const datosCategorias = await obtenerTodasLasCategorias();
-
       const documento = new jsPDF({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
       });
 
-      await agregarCabeceraPDF(
-  documento,
-  "Resultados generales de la competencia"
-);
-
-      const filasResumen = datosCategorias.map(
-        ({ categoria, resultados: lista }) => {
-          const completos = lista.filter(resultadoCompleto).length;
-          const total = lista.length;
-
-          return [
-            categoria.nombre,
-            total,
-            completos,
-            total > 0 && completos === total
-              ? "Completa"
-              : "Pendiente",
-          ];
-        }
+      await cabeceraPDF(
+        documento,
+        `Resultados oficiales - ${nombreCategoria}`
       );
 
-      autoTable(documento, {
-        startY: 38,
-        head: [
-          [
-            "Categoría",
-            "Competidores",
-            "Completos",
-            "Estado",
-          ],
-        ],
-        body: filasResumen,
-        theme: "grid",
-        styles: {
-          fontSize: 10,
-          cellPadding: 4,
-          halign: "center",
-        },
-        headStyles: {
-          fillColor: [49, 46, 24],
-          textColor: [245, 197, 66],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          0: { halign: "left", cellWidth: 85 },
-        },
-      });
-
-      for (const { categoria, resultados: lista } of datosCategorias) {
-
-  documento.addPage("a4", "landscape");
-
-  await agregarCabeceraPDF(
-    documento,
-    `Resultados oficiales - ${categoria.nombre}`
-  );
-
-  agregarTablaPDF(documento, lista);
-
-  agregarFirmasPDF(documento);
-
-}
+      tablaPDF(documento, resultados);
+      firmasPDF(documento);
 
       documento.save(
-        `Resultados_Completos_${limpiarNombreArchivo(nombreTorneo)}.pdf`
+        `Resultados_${nombreArchivo(nombreCategoria)}.pdf`
       );
-    } catch (errorExportacion) {
-      console.error(errorExportacion);
-      alert(errorExportacion.message);
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
     } finally {
       setExportando(false);
     }
   }
 
+  async function exportarPDFCompleto() {
+    if (!categorias.length) return alert("No existen categorías.");
+
+    setExportando(true);
+
+    try {
+      const datos = await cargarTodasLasCategorias();
+      const documento = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      await cabeceraPDF(documento, "Resultados generales");
+
+      const resumen = datos.map(({ categoria, resultados: lista }) => [
+        categoria.nombre,
+        lista.length,
+        lista.filter(completo).length,
+        lista.length > 0 && lista.every(completo)
+          ? "Completa"
+          : "Pendiente",
+      ]);
+
+      autoTable(documento, {
+        startY: 45,
+        head: [["Categoría", "Competidores", "Completos", "Estado"]],
+        body: resumen,
+        theme: "grid",
+        headStyles: {
+          fillColor: [49, 46, 24],
+          textColor: [245, 197, 66],
+        },
+      });
+
+      for (const { categoria, resultados: lista } of datos) {
+        documento.addPage("a4", "landscape");
+        await cabeceraPDF(
+          documento,
+          `Resultados oficiales - ${categoria.nombre}`
+        );
+        tablaPDF(documento, lista);
+        firmasPDF(documento);
+      }
+
+      documento.save(
+        `Resultados_Completos_${nombreArchivo(nombreTorneo)}.pdf`
+      );
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function publicarPantalla(participanteId) {
+    setPublicandoId(participanteId);
+    setMensaje("");
+
+    try {
+      const respuesta = await fetch(`${API_URL}/publicar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participante_id: participanteId }),
+      });
+
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        throw new Error(datos.error || "No se pudo publicar.");
+      }
+
+      setMensaje("✅ Competidor publicado en la pantalla LED.");
+    } catch (e) {
+      console.error(e);
+      setMensaje(`❌ ${e.message}`);
+    } finally {
+      setPublicandoId(null);
+    }
+  }
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: "35px 20px",
-        boxSizing: "border-box",
-        background: "#111827",
-        color: "white",
-        fontFamily: "Arial, Helvetica, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: "1300px", margin: "0 auto" }}>
+    <div style={pagina}>
+      <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
         <NavbarAdmin />
 
         <button
           onClick={() => navigate("/administrador")}
-          style={estiloBotonVolver}
+          style={botonVolver}
         >
           ← Volver al administrador
         </button>
 
-        <h1
-          style={{
-            color: "#f5c542",
-            fontSize: "42px",
-            marginBottom: "8px",
-          }}
-        >
-          Resultados y exportación
-        </h1>
+        <h1 style={titulo}>Resultados y pantalla LED</h1>
 
-        <p style={{ color: "#d1d5db", fontSize: "18px" }}>
-          Descarga una categoría o toda la competencia en Excel y PDF.
-        </p>
-
-        <section
-          style={{
-            marginTop: "25px",
-            marginBottom: "22px",
-            padding: "20px",
-            background: "#1f2937",
-            borderRadius: "14px",
-          }}
-        >
-          <label
-            htmlFor="categoria-resultados"
-            style={{
-              display: "block",
-              marginBottom: "10px",
-              fontSize: "18px",
-            }}
-          >
+        <section style={panel}>
+          <label htmlFor="categoria-resultados">
             Categoría
           </label>
 
           <select
             id="categoria-resultados"
             value={categoriaId}
-            onChange={(evento) => {
-              setCategoriaId(evento.target.value);
-              setCargando(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "14px",
-              border: "2px solid #f5c542",
-              borderRadius: "10px",
-              fontSize: "19px",
-            }}
+            onChange={(e) => setCategoriaId(e.target.value)}
+            style={selector}
           >
             {categorias.map((categoria) => (
               <option key={categoria.id} value={categoria.id}>
@@ -683,233 +514,109 @@ export default function ResultadosAdmin() {
           </select>
         </section>
 
-        <h3 style={{ color: "#f5c542" }}>Exportar categoría seleccionada</h3>
-
-        <section style={estiloGrupoBotones}>
+        <section style={botonera}>
           <button
             onClick={exportarExcelCategoria}
-            disabled={cargando || resultados.length === 0}
-            style={{
-              ...estiloBotonExportar,
-              background: "#15803d",
-              opacity:
-                cargando || resultados.length === 0 ? 0.6 : 1,
-            }}
+            style={{ ...botonExportar, background: "#15803d" }}
           >
-            📊 Excel de esta categoría
+            📊 Excel categoría
           </button>
 
           <button
             onClick={exportarPDFCategoria}
-            disabled={cargando || resultados.length === 0}
-            style={{
-              ...estiloBotonExportar,
-              background: "#b91c1c",
-              opacity:
-                cargando || resultados.length === 0 ? 0.6 : 1,
-            }}
+            style={{ ...botonExportar, background: "#b91c1c" }}
           >
-            📄 PDF de esta categoría
+            📄 PDF categoría
           </button>
-        </section>
 
-        <h3 style={{ color: "#f5c542", marginTop: "28px" }}>
-          Exportar competencia completa
-        </h3>
-
-        <section style={estiloGrupoBotones}>
           <button
             onClick={exportarExcelCompleto}
-            disabled={exportando || categorias.length === 0}
-            style={{
-              ...estiloBotonExportar,
-              background: "#166534",
-              opacity: exportando ? 0.6 : 1,
-            }}
+            style={{ ...botonExportar, background: "#166534" }}
           >
-            📊 Excel con todas las categorías
+            📊 Excel completo
           </button>
 
           <button
             onClick={exportarPDFCompleto}
-            disabled={exportando || categorias.length === 0}
-            style={{
-              ...estiloBotonExportar,
-              background: "#991b1b",
-              opacity: exportando ? 0.6 : 1,
-            }}
+            style={{ ...botonExportar, background: "#991b1b" }}
           >
-            📄 PDF con toda la competencia
+            📄 PDF completo
           </button>
         </section>
 
-        {exportando && (
-          <p
-            style={{
-              padding: "14px",
-              marginTop: "18px",
-              background: "#1e3a8a",
-              borderRadius: "10px",
-              textAlign: "center",
-            }}
-          >
-            Preparando archivo completo...
-          </p>
-        )}
-
-        <h2
-          style={{
-            textAlign: "center",
-            color: "#f5c542",
-            fontSize: "34px",
-            marginTop: "35px",
-          }}
+        <a
+          href="/pantalla"
+          target="_blank"
+          rel="noreferrer"
+          style={enlacePantalla}
         >
-          {nombreCategoria}
-        </h2>
+          📺 Abrir pantalla LED
+        </a>
+
+        {mensaje && <p style={mensajeEstilo}>{mensaje}</p>}
+
+        <h2 style={subtitulo}>{nombreCategoria}</h2>
 
         {cargando && <p>Cargando resultados...</p>}
-
-        {error && (
-          <p
-            style={{
-              padding: "15px",
-              background: "#7f1d1d",
-              color: "#fecaca",
-              borderRadius: "10px",
-            }}
-          >
-            {error}
-          </p>
-        )}
+        {error && <p style={errorEstilo}>{error}</p>}
 
         {!cargando && !error && (
-          <div
-            style={{
-              overflowX: "auto",
-              marginTop: "25px",
-              borderRadius: "14px",
-              border: "1px solid #4b5563",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                minWidth: "1100px",
-                borderCollapse: "collapse",
-                background: "#1f2937",
-              }}
-            >
+          <div style={tablaContenedor}>
+            <table style={tabla}>
               <thead>
                 <tr style={{ background: "#312e18" }}>
-                  <th style={estiloEncabezado}>Lugar</th>
-                  <th style={estiloEncabezado}>Código</th>
-                  <th style={estiloEncabezado}>Competidor</th>
-                  <th style={estiloEncabezado}>Jurado 1</th>
-                  <th style={estiloEncabezado}>Jurado 2</th>
-                  <th style={estiloEncabezado}>Jurado 3</th>
-                  <th style={estiloEncabezado}>Jurado 4</th>
-                  <th style={estiloEncabezado}>
-                    Jurado 5
-                    <div
-                      style={{
-                        color: "#f5c542",
-                        fontSize: "12px",
-                        marginTop: "4px",
-                      }}
-                    >
-                      Incógnito
-                    </div>
-                  </th>
-                  <th style={estiloEncabezado}>Evaluados</th>
-                  <th style={estiloEncabezado}>Total</th>
+                  {[
+                    "Lugar", "Código", "Competidor", "J1", "J2", "J3",
+                    "J4", "J5", "Evaluados", "Total", "Pantalla LED",
+                  ].map((texto) => (
+                    <th key={texto} style={encabezado}>
+                      {texto}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody>
-                {resultados.map((resultado, indice) => {
-                  const completo = resultadoCompleto(resultado);
-
-                  return (
-                    <tr
-                      key={resultado.participante_id}
-                      style={{
-                        background:
-                          indice === 0 && completo
-                            ? "#4c3a0a"
-                            : "#1f2937",
-                        borderBottom: "1px solid #374151",
-                      }}
-                    >
-                      <td style={estiloCelda}>
-                        {completo ? `${indice + 1}°` : "—"}
-                      </td>
-
-                      <td
-                        style={{
-                          ...estiloCelda,
-                          color: "#f5c542",
-                          fontWeight: "bold",
-                          fontSize: "18px",
-                        }}
+                {resultados.map((r, i) => (
+                  <tr
+                    key={r.participante_id}
+                    style={{ borderBottom: "1px solid #374151" }}
+                  >
+                    <td style={celda}>
+                      {completo(r) ? `${i + 1}°` : "—"}
+                    </td>
+                    <td style={{ ...celda, color: "#f5c542" }}>
+                      {r.codigo || "—"}
+                    </td>
+                    <td style={{ ...celda, textAlign: "left" }}>
+                      {r.participante}
+                    </td>
+                    <td style={celda}>{r.jurado_1 ?? "—"}</td>
+                    <td style={celda}>{r.jurado_2 ?? "—"}</td>
+                    <td style={celda}>{r.jurado_3 ?? "—"}</td>
+                    <td style={celda}>{r.jurado_4 ?? "—"}</td>
+                    <td style={{ ...celda, color: "#f5c542" }}>
+                      {r.jurado_5 ?? "?"}
+                    </td>
+                    <td style={celda}>{r.jurados_evaluados}/5</td>
+                    <td style={{ ...celda, color: "#f5c542" }}>
+                      {completo(r) ? r.total_general : "Pendiente"}
+                    </td>
+                    <td style={celda}>
+                      <button
+                        onClick={() =>
+                          publicarPantalla(r.participante_id)
+                        }
+                        disabled={publicandoId === r.participante_id}
+                        style={botonPublicar}
                       >
-                        {resultado.codigo || "—"}
-                      </td>
-
-                      <td
-                        style={{
-                          ...estiloCelda,
-                          textAlign: "left",
-                          fontWeight: "bold",
-                          fontSize: "18px",
-                        }}
-                      >
-                        {resultado.participante}
-                      </td>
-
-                      <td style={estiloCelda}>
-                        {resultado.jurado_1 ?? "—"}
-                      </td>
-                      <td style={estiloCelda}>
-                        {resultado.jurado_2 ?? "—"}
-                      </td>
-                      <td style={estiloCelda}>
-                        {resultado.jurado_3 ?? "—"}
-                      </td>
-                      <td style={estiloCelda}>
-                        {resultado.jurado_4 ?? "—"}
-                      </td>
-                      <td
-                        style={{
-                          ...estiloCelda,
-                          color: "#f5c542",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {resultado.jurado_5 ?? "?"}
-                      </td>
-
-                      <td style={estiloCelda}>
-                        {resultado.jurados_evaluados} / 5
-                      </td>
-
-                      <td
-                        style={{
-                          ...estiloCelda,
-                          color: completo
-                            ? "#f5c542"
-                            : "#d1d5db",
-                          fontWeight: "bold",
-                          fontSize: "22px",
-                        }}
-                      >
-                        {completo
-                          ? resultado.total_general
-                          : "Pendiente"}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        {publicandoId === r.participante_id
+                          ? "Publicando..."
+                          : "📺 Publicar"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -919,7 +626,44 @@ export default function ResultadosAdmin() {
   );
 }
 
-const estiloBotonVolver = {
+const pagina = {
+  minHeight: "100vh",
+  padding: "35px 20px",
+  background: "#111827",
+  color: "white",
+  fontFamily: "Arial, Helvetica, sans-serif",
+};
+
+const titulo = {
+  color: "#f5c542",
+  fontSize: "42px",
+};
+
+const subtitulo = {
+  textAlign: "center",
+  color: "#f5c542",
+  fontSize: "34px",
+  marginTop: "35px",
+};
+
+const panel = {
+  margin: "25px 0 22px",
+  padding: "20px",
+  background: "#1f2937",
+  borderRadius: "14px",
+};
+
+const selector = {
+  display: "block",
+  width: "100%",
+  marginTop: "10px",
+  padding: "14px",
+  border: "2px solid #f5c542",
+  borderRadius: "10px",
+  fontSize: "19px",
+};
+
+const botonVolver = {
   padding: "11px 18px",
   background: "#374151",
   color: "white",
@@ -928,33 +672,80 @@ const estiloBotonVolver = {
   cursor: "pointer",
 };
 
-const estiloGrupoBotones = {
+const botonera = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "15px",
-  marginBottom: "15px",
+  marginBottom: "18px",
 };
 
-const estiloBotonExportar = {
+const botonExportar = {
   padding: "16px",
   color: "white",
   border: "none",
   borderRadius: "10px",
-  fontSize: "18px",
+  fontSize: "17px",
   fontWeight: "bold",
   cursor: "pointer",
 };
 
-const estiloEncabezado = {
+const enlacePantalla = {
+  display: "inline-block",
+  padding: "14px 20px",
+  color: "white",
+  background: "#2563eb",
+  borderRadius: "10px",
+  textDecoration: "none",
+  fontWeight: "bold",
+};
+
+const mensajeEstilo = {
+  padding: "14px",
+  background: "#14532d",
+  borderRadius: "10px",
+  textAlign: "center",
+};
+
+const errorEstilo = {
+  padding: "15px",
+  background: "#7f1d1d",
+  color: "#fecaca",
+  borderRadius: "10px",
+};
+
+const tablaContenedor = {
+  overflowX: "auto",
+  marginTop: "25px",
+  borderRadius: "14px",
+  border: "1px solid #4b5563",
+};
+
+const tabla = {
+  width: "100%",
+  minWidth: "1320px",
+  borderCollapse: "collapse",
+  background: "#1f2937",
+};
+
+const encabezado = {
   padding: "16px 12px",
   borderBottom: "2px solid #f5c542",
   color: "#f5c542",
   textAlign: "center",
-  fontSize: "16px",
 };
 
-const estiloCelda = {
+const celda = {
   padding: "15px 12px",
   textAlign: "center",
   color: "white",
+};
+
+const botonPublicar = {
+  padding: "10px 14px",
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: "8px",
+  fontWeight: "bold",
+  cursor: "pointer",
 };
