@@ -199,7 +199,9 @@ export default function Login() {
 
           {jurados.map((jurado) => (
             <option key={jurado.id} value={jurado.id}>
-              {jurado.nombre}
+              {jurado.id === 4
+  ? "🔒 Jurado Incógnito"
+  : jurado.nombre}
               {jurado.visible === 0 ? " — Incógnito" : ""}
             </option>
           ))}
