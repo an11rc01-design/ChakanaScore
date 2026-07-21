@@ -259,7 +259,7 @@ export default function Publico() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "90px minmax(220px, 1fr) 180px 180px",
+                    "90px minmax(250px, 1fr) minmax(520px, 620px)",
                   alignItems: "center",
                   gap: "20px",
                   padding: "22px",
@@ -349,9 +349,12 @@ export default function Publico() {
                 <div
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(5, minmax(85px, 1fr))",
+    gridTemplateColumns: "repeat(5, minmax(75px, 1fr))",
+alignItems: "stretch",
+width: "100%",
     gap: "12px",
-    gridColumn: "3 / span 2",
+    gridColumn: "3",
+width: "100%",
   }}
 >
   {[
